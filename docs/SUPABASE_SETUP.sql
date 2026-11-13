@@ -145,3 +145,35 @@ CREATE POLICY "kwp_storage_admin_delete"
         bucket_id = 'kazakh-worship'
         AND ((select auth.jwt() ->> 'email') IN ('junbaehyun.kz@gmail.com', 'wnsqo35@gmail.com'))
     );
+
+-- 6. Seed initial test song (stored in Google Drive via GAS)
+INSERT INTO public.kwp_songs (
+    title,
+    artist,
+    is_unknown_author,
+    permission_note,
+    audio_url,
+    storage_path,
+    duration_seconds,
+    lyrics,
+    play_count,
+    uploaded_by,
+    status,
+    is_active
+)
+SELECT
+    'Кел, кел бізге Имануил',
+    'Дамира Мусаева',
+    false,
+    'Test track (#5887)',
+    'gdrive://1HOiGn1spawD9U_qIrNOC66u4i5qj4LFd',
+    '1HOiGn1spawD9U_qIrNOC66u4i5qj4LFd',
+    159,
+    E'Кел, кел бізге, Имануил,\nҚұдай бізбен бірге Имануил.\nКүтеміз біз сені, Имануил,\nТәңір бізбен бірге - Имануил.\n\n// Шаттан, шаттан, шаттан Қазақстан,\nИмануел саған келмек //',
+    1,
+    'developer',
+    'published',
+    true
+WHERE NOT EXISTS (
+    SELECT 1 FROM public.kwp_songs WHERE storage_path = '1HOiGn1spawD9U_qIrNOC66u4i5qj4LFd'
+);

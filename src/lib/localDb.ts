@@ -3,7 +3,7 @@ import type { Song, SongReport } from '../types';
 const DB_NAME = 'kwp_offline_db';
 const DB_VERSION = 1;
 const BLOB_STORE = 'offline_blobs';
-const SONGS_KEY = 'kwp_local_songs_v1';
+const SONGS_KEY = 'kwp_local_songs_v2';
 const REPORTS_KEY = 'kwp_local_reports_v1';
 
 interface OfflineBlobRecord {
@@ -131,6 +131,23 @@ export function createDemoToneWavBlob(freqHz = 261.63, seconds = 6): Blob {
 }
 
 const DEFAULT_LOCAL_SONGS: Song[] = [
+  {
+    id: 'song-5887',
+    title: 'Кел, кел бізге Имануил',
+    artist: 'Дамира Мусаева',
+    is_unknown_author: false,
+    permission_note: 'Test track from worshipleaderapp.com (#5887)',
+    audio_url: 'gdrive://1HOiGn1spawD9U_qIrNOC66u4i5qj4LFd',
+    storage_path: '1HOiGn1spawD9U_qIrNOC66u4i5qj4LFd',
+    duration_seconds: 159,
+    lyrics:
+      'Кел, кел бізге, Имануил,\nҚұдай бізбен бірге Имануил.\nКүтеміз біз сені, Имануил,\nТәңір бізбен бірге - Имануил.\n\n// Шаттан, шаттан, шаттан Қазақстан,\nИмануел саған келмек //',
+    play_count: 150,
+    uploaded_by: 'developer',
+    status: 'published',
+    is_active: true,
+    created_at: new Date().toISOString(),
+  },
   {
     id: 'demo-1',
     title: 'Ұлы Құдай (Demo)',
