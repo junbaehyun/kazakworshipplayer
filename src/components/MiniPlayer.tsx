@@ -7,6 +7,7 @@ interface MiniPlayerProps {
   song: Song;
   isPlaying: boolean;
   isOffline: boolean;
+  hasBottomNav?: boolean;
   currentTime: number;
   duration: number;
   t: TranslationStrings;
@@ -19,6 +20,7 @@ export function MiniPlayer({
   song,
   isPlaying,
   isOffline,
+  hasBottomNav = true,
   currentTime,
   duration,
   t,
@@ -33,7 +35,7 @@ export function MiniPlayer({
   return (
     <div
       onClick={onExpand}
-      className="fixed bottom-[64px] left-1/2 -translate-x-1/2 w-[calc(100%-24px)] max-w-[406px] z-30 bg-white/90 backdrop-blur-xl rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.10)] border border-black/[0.06] px-3 py-2 cursor-pointer active:scale-[0.99] am-spring"
+      className={`fixed ${hasBottomNav ? 'bottom-[64px]' : 'bottom-3'} left-1/2 -translate-x-1/2 w-[calc(100%-24px)] max-w-[406px] z-30 bg-white/90 backdrop-blur-xl rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.10)] border border-black/[0.06] px-3 py-2 cursor-pointer active:scale-[0.99] am-spring`}
     >
       <div className="flex items-center justify-between gap-2.5">
         <div className="flex items-center gap-2.5 min-w-0">

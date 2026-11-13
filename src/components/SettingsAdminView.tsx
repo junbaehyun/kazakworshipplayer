@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { Check, ChevronRight, CloudUpload, Download, HardDrive, LogOut, Mail, RotateCcw, ShieldCheck, Trash2, Trophy } from 'lucide-react';
+import { BookOpen, Check, ChevronRight, CloudUpload, Code2, Download, HardDrive, LogOut, Mail, RotateCcw, ShieldCheck, Trash2, Trophy } from 'lucide-react';
 import type { Session } from '@supabase/supabase-js';
 import type { TranslationStrings } from '../i18n/translations';
 import {
@@ -19,6 +19,8 @@ interface SettingsAdminViewProps {
   offlineCount: number;
   offlineBytes: number;
   songs: Song[];
+  showKaynarTab: boolean;
+  onToggleKaynarTab: (next: boolean) => void;
   onClearOffline: () => Promise<void>;
   onSessionChange: (session: Session | null) => void;
   onRefreshSongs: () => Promise<void>;
@@ -33,6 +35,8 @@ export function SettingsAdminView({
   offlineCount,
   offlineBytes,
   songs,
+  showKaynarTab,
+  onToggleKaynarTab,
   onClearOffline,
   onSessionChange,
   onRefreshSongs,
@@ -45,6 +49,18 @@ export function SettingsAdminView({
   const [authError, setAuthError] = useState<string | null>(null);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [reports, setReports] = useState<SongReport[]>([]);
+  const [dombraTapCount, setDombraTapCount] = useState(0);
+  const [devSettingsOpen, setDevSettingsOpen] = useState(false);
+
+  const handleDombraTap = () => {
+    const next = dombraTapCount + 1;
+    if (next >= 5) {
+      setDevSettingsOpen((prev) => !prev);
+      setDombraTapCount(0);
+    } else {
+      setDombraTapCount(next);
+    }
+  };
 
   useEffect(() => {
     if (session) {
@@ -147,6 +163,85 @@ export function SettingsAdminView({
           <span>Reset</span>
         </button>
       </div>
+
+      {/* About Us Card with Kazakh Dombra Icon (Tap 5x for Dev Settings) */}
+      <div className="bg-[#FAF7F2] border border-[#E5DEC9] rounded-2xl p-4 flex items-center gap-3.5">
+        <button
+          type="button"
+          onClick={handleDombraTap}
+          aria-label="About Us — Kazakh Dombra"
+          className="w-12 h-12 rounded-2xl bg-white border border-[#E5DEC9] flex items-center justify-center shrink-0 shadow-xs active:scale-95 transition"
+        >
+          <svg viewBox="0 0 64 64" className="w-8 h-8" fill="none">
+            {/* Dombra Neck & Crossbar */}
+            <path d="M32 6 V34" stroke="#1D1D1F" strokeWidth="2.6" strokeLinecap="round" />
+            <path d="M26 12 H38" stroke="#FA243C" strokeWidth="2.2" strokeLinecap="round" />
+            {/* Dombra Pear Body */}
+            <path
+              d="M32 24 C42 24 47 33 46 43 C45 53 39 58 32 58 C25 58 19 53 18 43 C17 33 22 24 32 24 Z"
+              fill="#FA243C"
+              fillOpacity="0.12"
+              stroke="#FA243C"
+              strokeWidth="2.4"
+            />
+            {/* Soundhole */}
+            <circle cx="32" cy="41" r="5" fill="#FFFFFF" stroke="#D99B26" strokeWidth="2" />
+            <circle cx="32" cy="41" r="1.6" fill="#FA243C" />
+            {/* Two Dombra Strings */}
+            <path d="M30.8 8 V52 M33.2 8 V52" stroke="#1D1D1F" strokeWidth="0.8" strokeOpacity="0.4" />
+          </svg>
+        </button>
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-extrabold text-[#1D1D1F]">About Us · {t.brand}</p>
+          <p className="text-[11px] text-[#515154] leading-relaxed mt-0.5">
+            Қазақ тіліндегі мадақтау әндері · Kazakh Worship Player v1.0
+          </p>
+        </div>
+      </div>
+
+      {/* Hidden Dev Settings (Revealed by tapping Dombra icon 5 times) */}
+      {devSettingsOpen && (
+        <div className="bg-[#1D1D1F] text-white rounded-2xl p-4 space-y-3 shadow-sm">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xs font-extrabold flex items-center gap-1.5">
+              <Code2 className="w-4 h-4 text-[#FA243C]" />
+              <span>Dev Settings</span>
+            </h3>
+            <button
+              type="button"
+              onClick={() => setDevSettingsOpen(false)}
+              className="text-[11px] text-white/60 hover:text-white"
+            >
+              Hide
+            </button>
+          </div>
+
+          <div className="flex items-center justify-between gap-3 bg-white/10 rounded-xl px-3.5 py-2.5">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <BookOpen className="w-4 h-4 text-[#FA243C] shrink-0" />
+              <div className="min-w-0">
+                <p className="text-xs font-semibold truncate">{t.tabKaynar} (바컷 카이나르)</p>
+                <p className="text-[11px] text-white/60 truncate">Show/hide bottom tab menu</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={showKaynarTab}
+              onClick={() => onToggleKaynarTab(!showKaynarTab)}
+              className={`w-11 h-6 rounded-full p-0.5 transition shrink-0 ${
+                showKaynarTab ? 'bg-[#34C759]' : 'bg-white/25'
+              }`}
+            >
+              <span
+                className={`block w-5 h-5 rounded-full bg-white shadow-xs transition-transform ${
+                  showKaynarTab ? 'translate-x-5' : 'translate-x-0'
+                }`}
+              />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Copyright & Contact Card */}
       <div className="bg-[#FFF8F6] border border-[#FA243C]/15 rounded-2xl p-4 space-y-2">

@@ -32,6 +32,7 @@ import type { Language, Song, TabId } from './types';
 
 const LANGS: Language[] = ['kk', 'ko', 'en', 'ru'];
 const PLAYLIST_KEY = 'kwp_playlist_ids_v1';
+const DEV_KAYNAR_KEY = 'kwp_dev_show_kaynar';
 
 export function App() {
   const [lang, setLang] = useState<Language>(() => {
@@ -57,6 +58,9 @@ export function App() {
   const [noticeOpen, setNoticeOpen] = useState(false);
   const [reportTargetSong, setReportTargetSong] = useState<Song | null>(null);
   const [session, setSession] = useState<Session | null>(null);
+  const [showKaynarTab, setShowKaynarTab] = useState<boolean>(() => {
+    return localStorage.getItem(DEV_KAYNAR_KEY) === 'true';
+  });
   const hasAutoLoadedRef = useRef(false);
 
   const t = translations[lang];
@@ -64,6 +68,14 @@ export function App() {
   const handleSetLang = (next: Language) => {
     setLang(next);
     localStorage.setItem('kwp_lang', next);
+  };
+
+  const handleToggleKaynarTab = (next: boolean) => {
+    setShowKaynarTab(next);
+    localStorage.setItem(DEV_KAYNAR_KEY, String(next));
+    if (!next && tab === 'kaynar') {
+      setTab('listen');
+    }
   };
 
   const refreshOfflineStats = useCallback(async () => {
@@ -226,22 +238,42 @@ export function App() {
               <span className="text-xs font-semibold tracking-tight text-[#86868B]">{t.brand}</span>
             </div>
 
-            {/* 4-Language Segmented Control: KK | KO | EN | RU */}
-            <div className="inline-flex rounded-lg bg-[#F5F5F7] p-0.5 border border-black/[0.04]">
-              {LANGS.map((l) => (
-                <button
-                  key={l}
-                  type="button"
-                  onClick={() => handleSetLang(l)}
-                  className={`px-2 py-0.5 rounded-md text-xs transition ${
-                    lang === l
-                      ? 'bg-white text-[#1D1D1F] font-bold shadow-xs'
-                      : 'text-[#86868B] font-medium'
-                  }`}
-                >
-                  {l.toUpperCase()}
-                </button>
-              ))}
+            {/* 4-Language Segmented Control + Settings Icon */}
+            <div className="flex items-center gap-1.5">
+              <div className="inline-flex rounded-lg bg-[#F5F5F7] p-0.5 border border-black/[0.04]">
+                {LANGS.map((l) => (
+                  <button
+                    key={l}
+                    type="button"
+                    onClick={() => handleSetLang(l)}
+                    className={`px-2 py-0.5 rounded-md text-xs transition ${
+                      lang === l
+                        ? 'bg-white text-[#1D1D1F] font-bold shadow-xs'
+                        : 'text-[#86868B] font-medium'
+                    }`}
+                  >
+                    {l.toUpperCase()}
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={() =>
+                  setTab(
+                    tab === 'settings' || tab === 'chart' || tab === 'offline' || tab === 'upload'
+                      ? 'listen'
+                      : 'settings'
+                  )
+                }
+                aria-label={t.tabSettings}
+                className={`w-7 h-7 rounded-lg flex items-center justify-center border transition ${
+                  tab === 'settings' || tab === 'chart' || tab === 'offline' || tab === 'upload'
+                    ? 'bg-[#FA243C] text-white border-[#FA243C]'
+                    : 'bg-[#F5F5F7] text-[#1D1D1F] border-black/[0.04]'
+                }`}
+              >
+                <Settings className="w-3.5 h-3.5" />
+              </button>
             </div>
           </div>
 
@@ -545,6 +577,8 @@ export function App() {
               offlineCount={offlineIds.length}
               offlineBytes={offlineBytes}
               songs={songs}
+              showKaynarTab={showKaynarTab}
+              onToggleKaynarTab={handleToggleKaynarTab}
               onClearOffline={handleClearOffline}
               onSessionChange={setSession}
               onRefreshSongs={refreshSongs}
@@ -564,6 +598,7 @@ export function App() {
             song={player.currentSong}
             isPlaying={player.isPlaying}
             isOffline={offlineIds.includes(player.currentSong.id)}
+            hasBottomNav={showKaynarTab}
             currentTime={player.currentTime}
             duration={player.duration}
             t={t}
@@ -573,39 +608,38 @@ export function App() {
           />
         )}
 
-        {/* Bottom Mobile Tab Bar (3 Primary Tabs; Chart/Offline/Upload live in Settings) */}
-        <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] h-[56px] bg-white/95 backdrop-blur-xl border-t border-black/[0.06] z-30 grid grid-cols-3 px-1">
-          {(
-            [
-              { id: 'listen', icon: Music, label: t.tabListen },
-              { id: 'kaynar', icon: BookOpen, label: t.tabKaynar },
-              { id: 'settings', icon: Settings, label: t.tabSettings },
-            ] as const
-          ).map(({ id, icon: Icon, label }) => {
-            const active =
-              tab === id ||
-              (id === 'settings' && (tab === 'chart' || tab === 'offline' || tab === 'upload'));
-            return (
-              <button
-                key={id}
-                type="button"
-                onClick={() => setTab(id)}
-                className={`flex flex-col items-center justify-center gap-0.5 min-w-0 px-0.5 ${
-                  active ? 'text-[#FA243C]' : 'text-[#86868B]'
-                }`}
-              >
-                <Icon className="w-4 h-4 shrink-0" />
-                <span
-                  className={`text-[10px] leading-none truncate max-w-full ${
-                    active ? 'font-bold' : 'font-medium'
+        {/* Bottom Mobile Tab Bar (Shown only when Бақыт қайнар menu is enabled in Dev Settings) */}
+        {showKaynarTab && (
+          <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] h-[56px] bg-white/95 backdrop-blur-xl border-t border-black/[0.06] z-30 grid grid-cols-2 px-1">
+            {(
+              [
+                { id: 'listen', icon: Music, label: t.tabListen },
+                { id: 'kaynar', icon: BookOpen, label: t.tabKaynar },
+              ] as const
+            ).map(({ id, icon: Icon, label }) => {
+              const active = tab === id;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setTab(id)}
+                  className={`flex flex-col items-center justify-center gap-0.5 min-w-0 px-0.5 ${
+                    active ? 'text-[#FA243C]' : 'text-[#86868B]'
                   }`}
                 >
-                  {label}
-                </span>
-              </button>
-            );
-          })}
-        </nav>
+                  <Icon className="w-4 h-4 shrink-0" />
+                  <span
+                    className={`text-[10px] leading-none truncate max-w-full ${
+                      active ? 'font-bold' : 'font-medium'
+                    }`}
+                  >
+                    {label}
+                  </span>
+                </button>
+              );
+            })}
+          </nav>
+        )}
 
         {/* Slide-Up Full-Screen Now Playing Sheet */}
         {player.currentSong && (
