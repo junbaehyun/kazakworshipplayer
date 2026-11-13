@@ -81,50 +81,58 @@ export async function uploadSong(params: {
   artist: string;
   isUnknownAuthor: boolean;
   lyrics: string;
-  file: File;
+  file?: File | null;
+  externalUrl?: string;
   durationSeconds: number;
   isAdmin: boolean;
 }): Promise<{ song: Song; savedLocally: boolean }> {
   const cleanArtist = params.isUnknownAuthor || !params.artist.trim()
     ? 'Белгісіз автор (Unknown)'
     : params.artist.trim();
+  const trimmedUrl = params.externalUrl?.trim() || '';
 
   if (supabase) {
     try {
-      let audioUrl = '';
+      let audioUrl = trimmedUrl;
       let storagePath: string | null = null;
 
-      if (GAS_WEBAPP_URL) {
-        // Upload to Google Drive via GAS Web App (15 GB free, $0)
-        const base64Data = await fileToBase64(params.file);
-        const gasRes = await fetch(GAS_WEBAPP_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify({
-            fileName: params.file.name,
-            mimeType: params.file.type || 'audio/mpeg',
-            base64Data,
-          }),
-        });
-        const gasJson = (await gasRes.json()) as { ok: boolean; fileId?: string; error?: string };
-        if (!gasJson.ok || !gasJson.fileId) {
-          throw new Error(gasJson.error || 'Google Drive upload failed');
+      if (!audioUrl && params.file) {
+        if (GAS_WEBAPP_URL) {
+          // Upload to Google Drive via GAS Web App (15 GB free, $0)
+          const base64Data = await fileToBase64(params.file);
+          const gasRes = await fetch(GAS_WEBAPP_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({
+              fileName: params.file.name,
+              mimeType: params.file.type || 'audio/mpeg',
+              base64Data,
+            }),
+          });
+          const gasJson = (await gasRes.json()) as { ok: boolean; fileId?: string; error?: string };
+          if (!gasJson.ok || !gasJson.fileId) {
+            throw new Error(gasJson.error || 'Google Drive upload failed');
+          }
+          audioUrl = `gdrive://${gasJson.fileId}`;
+          storagePath = gasJson.fileId;
+        } else {
+          // Fallback to Supabase Storage
+          const safeName = params.file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+          storagePath = `${STORAGE_FOLDER}/${Date.now()}-${safeName}`;
+
+          const { error: uploadErr } = await supabase.storage
+            .from(STORAGE_BUCKET)
+            .upload(storagePath, params.file, { cacheControl: '3600', upsert: false });
+
+          if (uploadErr) throw uploadErr;
+
+          const { data: urlData } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(storagePath);
+          audioUrl = urlData.publicUrl;
         }
-        audioUrl = `gdrive://${gasJson.fileId}`;
-        storagePath = gasJson.fileId;
-      } else {
-        // Fallback to Supabase Storage
-        const safeName = params.file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-        storagePath = `${STORAGE_FOLDER}/${Date.now()}-${safeName}`;
+      }
 
-        const { error: uploadErr } = await supabase.storage
-          .from(STORAGE_BUCKET)
-          .upload(storagePath, params.file, { cacheControl: '3600', upsert: false });
-
-        if (uploadErr) throw uploadErr;
-
-        const { data: urlData } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(storagePath);
-        audioUrl = urlData.publicUrl;
+      if (!audioUrl) {
+        throw new Error('Either an audio file or an external URL is required.');
       }
 
       const { data: inserted, error: insertErr } = await supabase
@@ -146,7 +154,9 @@ export async function uploadSong(params: {
 
       if (insertErr) throw insertErr;
       const insertedSong = inserted as Song;
-      await saveOfflineBlob(insertedSong.id, params.file);
+      if (params.file) {
+        await saveOfflineBlob(insertedSong.id, params.file);
+      }
       return { song: insertedSong, savedLocally: false };
     } catch (err) {
       console.warn('Cloud upload failed, saving to local IndexedDB:', err);
@@ -155,14 +165,16 @@ export async function uploadSong(params: {
 
   // Local IndexedDB fallback
   const id = `local-${Date.now()}`;
-  await saveOfflineBlob(id, params.file);
+  if (params.file) {
+    await saveOfflineBlob(id, params.file);
+  }
   const newSong: Song = {
     id,
     title: params.title.trim(),
     artist: cleanArtist,
     is_unknown_author: params.isUnknownAuthor || !params.artist.trim(),
     permission_note: 'Permitted for community worship sharing',
-    audio_url: '',
+    audio_url: trimmedUrl,
     duration_seconds: Math.round(params.durationSeconds || 0),
     lyrics: params.lyrics.trim() || null,
     play_count: 0,
