@@ -1,0 +1,806 @@
+<!DOCTYPE html>
+<html lang="kk" class="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Kazakh Worship — Apple Music Day-Theme Mobile Prototype</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    /* Smooth Apple Music spring transitions */
+    .am-spring {
+      transition: all 0.35s cubic-bezier(0.32, 0.72, 0, 1);
+    }
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+  </style>
+</head>
+<body class="bg-[#EFEFF4] text-[#1D1D1F] antialiased select-none py-0 sm:py-6">
+
+  <!-- Mobile-Only App Frame (max-w-[430px] iPhone Pro Max / Mobile Viewport) -->
+  <div class="max-w-[430px] mx-auto bg-white min-h-screen sm:min-h-[844px] sm:max-h-[880px] sm:rounded-[42px] sm:shadow-[0_24px_70px_rgba(0,0,0,0.14)] sm:border-[6px] sm:border-white relative overflow-hidden flex flex-col">
+
+    <!-- Sticky Frosted Top Bar (Language Switcher + Notice Pill) -->
+    <header class="sticky top-0 z-20 bg-white/85 backdrop-blur-xl px-5 pt-4 pb-2.5 border-b border-black/[0.05]">
+      <div class="flex items-center justify-between gap-2">
+        <div class="flex items-center gap-1.5">
+          <span class="w-6 h-6 rounded-lg bg-[#FA243C] text-white flex items-center justify-center text-xs font-bold shadow-sm">♫</span>
+          <span id="ui-brand" class="text-xs font-semibold tracking-tight text-[#86868B]">Қазақша Мадақ</span>
+        </div>
+
+        <!-- 4-Language Segmented Control (KK | KO | EN | RU) -->
+        <div class="inline-flex rounded-lg bg-[#F5F5F7] p-0.5 border border-black/[0.04]">
+          <button onclick="setLang('kk')" id="lang-kk" class="px-2 py-0.5 rounded-md text-xs font-semibold transition">KK</button>
+          <button onclick="setLang('ko')" id="lang-ko" class="px-2 py-0.5 rounded-md text-xs font-semibold transition">KO</button>
+          <button onclick="setLang('en')" id="lang-en" class="px-2 py-0.5 rounded-md text-xs font-semibold transition">EN</button>
+          <button onclick="setLang('ru')" id="lang-ru" class="px-2 py-0.5 rounded-md text-xs font-semibold transition">RU</button>
+        </div>
+      </div>
+
+      <!-- Large Apple Music Editorial Title -->
+      <div class="flex items-baseline justify-between mt-2">
+        <h1 id="ui-page-title" class="text-2xl font-extrabold tracking-tight text-[#1D1D1F]">Тыңдау</h1>
+        <button onclick="openNoticeSheet()" id="ui-notice-pill" class="text-xs font-semibold text-[#FA243C] flex items-center gap-1 active:opacity-70">
+          <span>ℹ️</span>
+          <span id="ui-notice-btn-text">Авторлық құқық</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Scrollable Mobile Content Area -->
+    <main id="scroll-area" class="flex-1 overflow-y-auto no-scrollbar px-5 pt-3 pb-44 space-y-5">
+
+      <!-- Search Pill (#F5F5F7 Apple Music Search Bar) -->
+      <div id="search-box" class="relative">
+        <span class="absolute left-3.5 top-2.5 text-xs text-[#86868B]">🔍</span>
+        <input
+          id="search-input"
+          type="text"
+          oninput="renderView()"
+          placeholder="Ән атын немесе сөзін іздеу..."
+          class="w-full bg-[#F5F5F7] rounded-xl pl-9 pr-4 py-2 text-xs text-[#1D1D1F] placeholder-[#86868B] focus:outline-none focus:ring-2 focus:ring-[#FA243C]/30"
+        />
+      </div>
+
+      <!-- Unknown Author & Free Sharing Notice Banner (Compact Day Card) -->
+      <div onclick="openNoticeSheet()" class="bg-[#FFF8F6] border border-[#FA243C]/15 rounded-2xl p-3 flex items-start justify-between gap-2.5 cursor-pointer active:scale-[0.99] transition">
+        <div class="space-y-0.5">
+          <p id="ui-banner-title" class="text-xs font-bold text-[#FA243C]">
+            Авторы белгісіз және еркін бөлісілетін әндер
+          </p>
+          <p id="ui-banner-sub" class="text-xs text-[#515154] leading-snug">
+            Барлық әндер коммерциялық емес мадақ үшін бөлісілген. Авторды білсеңіз немесе өшіруді сұрасаңыз, осында басыңыз.
+          </p>
+        </div>
+        <span class="text-xs font-bold text-[#FA243C] shrink-0 mt-0.5">›</span>
+      </div>
+
+      <!-- Dynamic Screen Content -->
+      <div id="view-container" class="space-y-5"></div>
+    </main>
+
+    <!-- Floating Apple Music Frosted Mini-Player (Tap to open Full Player) -->
+    <div
+      onclick="openFullPlayer(event)"
+      class="absolute bottom-[62px] inset-x-3 z-30 bg-white/90 backdrop-blur-xl rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.10)] border border-black/[0.06] px-3 py-2 cursor-pointer active:scale-[0.99] am-spring"
+    >
+      <div class="flex items-center justify-between gap-2.5">
+        <div class="flex items-center gap-2.5 min-w-0">
+          <!-- Mini Artwork -->
+          <div id="mini-art" class="w-10 h-10 rounded-xl bg-gradient-to-br from-[#FA243C] to-[#FF7A00] flex items-center justify-center text-white font-bold text-sm shadow-sm shrink-0">
+            ♫
+          </div>
+          <div class="min-w-0">
+            <p id="mini-title" class="text-xs font-bold text-[#1D1D1F] truncate">Ұлы Құдай (Great God)</p>
+            <p id="mini-artist" class="text-xs text-[#86868B] truncate">Белгісіз автор · Офлайн дайын</p>
+          </div>
+        </div>
+
+        <!-- Mini Transport Buttons (Stop propagation so they don't open full sheet if clicked directly) -->
+        <div class="flex items-center gap-1 shrink-0" onclick="event.stopPropagation()">
+          <button onclick="togglePlay()" id="mini-play-btn" class="w-9 h-9 rounded-full flex items-center justify-center text-[#1D1D1F] hover:bg-black/5 text-base font-bold">
+            ▶
+          </button>
+          <button onclick="nextTrack()" class="w-8 h-8 rounded-full flex items-center justify-center text-[#1D1D1F] hover:bg-black/5 text-xs">
+            ⏭
+          </button>
+        </div>
+      </div>
+      <!-- Thin Apple Music Mini Progress Line -->
+      <div class="w-full bg-black/[0.06] h-0.5 rounded-full mt-1.5 overflow-hidden">
+        <div id="mini-progress" class="bg-[#FA243C] h-full w-[35%] transition-all"></div>
+      </div>
+    </div>
+
+    <!-- Native iOS / Apple Music Bottom Tab Bar -->
+    <nav class="absolute bottom-0 inset-x-0 h-[56px] bg-white/95 backdrop-blur-xl border-t border-black/[0.06] z-30 grid grid-cols-4 px-2">
+      <button onclick="setTab('listen')" id="tab-listen" class="flex flex-col items-center justify-center gap-0.5 text-[#FA243C]">
+        <span class="text-sm">🎵</span>
+        <span id="ui-tab-listen" class="text-xs font-semibold">Тыңдау</span>
+      </button>
+      <button onclick="setTab('chart')" id="tab-chart" class="flex flex-col items-center justify-center gap-0.5 text-[#86868B]">
+        <span class="text-sm">🏆</span>
+        <span id="ui-tab-chart" class="text-xs font-medium">Топ Чарт</span>
+      </button>
+      <button onclick="setTab('offline')" id="tab-offline" class="flex flex-col items-center justify-center gap-0.5 text-[#86868B] relative">
+        <span class="text-sm">📥</span>
+        <span id="ui-tab-offline" class="text-xs font-medium">Офлайн</span>
+      </button>
+      <button onclick="setTab('upload')" id="tab-upload" class="flex flex-col items-center justify-center gap-0.5 text-[#86868B]">
+        <span class="text-sm">＋</span>
+        <span id="ui-tab-upload" class="text-xs font-medium">Жүктеу</span>
+      </button>
+    </nav>
+
+    <!-- ===================================================================== -->
+    <!-- SLIDE-UP APPLE MUSIC FULL-SCREEN NOW PLAYING SHEET (DAY THEME)        -->
+    <!-- ===================================================================== -->
+    <div
+      id="full-player-sheet"
+      class="am-spring translate-y-full absolute inset-0 z-40 bg-gradient-to-b from-[#FFF5F6] via-white to-[#F5F5F7] flex flex-col justify-between px-6 pt-3 pb-6"
+    >
+      <!-- Top Grab Handle & Collapse Button -->
+      <div class="flex items-center justify-between">
+        <button onclick="closeFullPlayer()" class="text-xs font-semibold text-[#86868B] px-2 py-1 rounded-lg hover:bg-black/5">
+          ▼ <span id="ui-close-player">Жабу</span>
+        </button>
+        <div class="w-10 h-1.5 rounded-full bg-black/15"></div>
+        <button onclick="openNoticeSheet()" class="text-xs font-bold text-[#FA243C] px-2 py-1 rounded-lg bg-[#FA243C]/10">
+          •••
+        </button>
+      </div>
+
+      <!-- Center Artwork OR Synced Lyrics View -->
+      <div id="np-artwork-view" class="my-auto flex flex-col items-center py-2">
+        <div
+          id="np-artwork-box"
+          class="am-spring scale-95 w-56 h-56 rounded-3xl bg-gradient-to-br from-[#FA243C] via-[#FF5E3A] to-[#FF9500] shadow-[0_20px_50px_rgba(250,36,60,0.28)] flex flex-col items-center justify-center text-white p-6 text-center"
+        >
+          <span class="text-4xl mb-2">♫</span>
+          <p id="np-art-title" class="text-sm font-bold leading-snug">Ұлы Құдай</p>
+          <p class="text-xs opacity-80 mt-1">Kazakh Worship</p>
+        </div>
+      </div>
+
+      <!-- Synced Lyrics Card (Hidden by default, toggled via 💬 Lyrics pill) -->
+      <div id="np-lyrics-view" class="hidden my-auto bg-[#F5F5F7] rounded-3xl p-5 max-h-60 overflow-y-auto space-y-2 border border-black/[0.04]">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-bold uppercase tracking-wider text-[#FA243C]">Ән сөзі · Lyrics</span>
+          <button onclick="toggleLyricsView()" class="text-xs font-semibold text-[#86868B]">✕</button>
+        </div>
+        <p id="np-lyrics-text" class="text-sm font-semibold text-[#1D1D1F] whitespace-pre-line leading-relaxed"></p>
+      </div>
+
+      <!-- Track Title, Author & Offline Save Button -->
+      <div class="space-y-4">
+        <div class="flex items-center justify-between gap-3">
+          <div class="min-w-0">
+            <h2 id="np-title" class="text-lg font-extrabold text-[#1D1D1F] truncate">Ұлы Құдай (Great God)</h2>
+            <p id="np-artist" class="text-xs font-medium text-[#FA243C] truncate">Белгісіз автор (Unknown Author)</p>
+          </div>
+          <button
+            onclick="toggleCurrentOffline()"
+            id="np-offline-btn"
+            class="px-3 py-1.5 rounded-full text-xs font-semibold bg-[#F5F5F7] text-[#1D1D1F] shrink-0 transition"
+          >
+            ↓ Офлайн
+          </button>
+        </div>
+
+        <!-- Scrubber Bar -->
+        <div class="space-y-1">
+          <input
+            id="np-scrub"
+            type="range"
+            min="0"
+            max="100"
+            value="35"
+            oninput="scrubTo(this.value)"
+            class="w-full accent-[#FA243C] h-1.5 rounded-lg cursor-pointer"
+          />
+          <div class="flex justify-between text-xs font-mono text-[#86868B]">
+            <span id="np-cur-time">01:28</span>
+            <span class="text-[#1D1D1F] font-sans font-medium" id="np-plays-pill">▶ 1,248</span>
+            <span id="np-rem-time">-02:44</span>
+          </div>
+        </div>
+
+        <!-- Main Apple Music Transport Controls -->
+        <div class="flex items-center justify-around py-1">
+          <button onclick="prevTrack()" class="text-2xl text-[#1D1D1F] active:scale-90 transition">⏮</button>
+          <button
+            onclick="togglePlay()"
+            id="np-play-btn"
+            class="w-16 h-16 rounded-full bg-[#FA243C] text-white text-xl font-bold shadow-lg shadow-[#FA243C]/30 flex items-center justify-center active:scale-95 transition"
+          >
+            ▶
+          </button>
+          <button onclick="nextTrack()" class="text-2xl text-[#1D1D1F] active:scale-90 transition">⏭</button>
+        </div>
+
+        <!-- Bottom Apple Music Mode Pills (Lyrics, Shuffle, Repeat, Claim Author) -->
+        <div class="grid grid-cols-4 gap-2 pt-1">
+          <button
+            onclick="toggleLyricsView()"
+            id="pill-lyrics"
+            class="py-2 rounded-xl bg-[#F5F5F7] text-[#1D1D1F] text-xs font-semibold flex items-center justify-center gap-1 transition"
+          >
+            💬 Сөзі
+          </button>
+          <button
+            onclick="toggleShuffle()"
+            id="pill-shuffle"
+            class="py-2 rounded-xl bg-[#F5F5F7] text-[#1D1D1F] text-xs font-semibold flex items-center justify-center gap-1 transition"
+          >
+            🔀 Shuffle
+          </button>
+          <button
+            onclick="cycleRepeat()"
+            id="pill-repeat"
+            class="py-2 rounded-xl bg-[#FA243C]/15 text-[#FA243C] text-xs font-bold flex items-center justify-center gap-1 transition"
+          >
+            🔁 All
+          </button>
+          <button
+            onclick="openNoticeSheet()"
+            class="py-2 rounded-xl bg-[#F5F5F7] text-[#1D1D1F] text-xs font-semibold flex items-center justify-center gap-1 transition"
+          >
+            ⚠️ Автор
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- COPYRIGHT & UNKNOWN AUTHOR NOTICE / CLAIM SHEET (DAY THEME)           -->
+    <!-- ===================================================================== -->
+    <div
+      id="notice-sheet"
+      class="hidden absolute inset-0 z-50 bg-black/30 backdrop-blur-xs flex items-end"
+    >
+      <div class="bg-white w-full rounded-t-3xl p-5 space-y-3.5 shadow-2xl border-t border-black/5">
+        <div class="flex items-center justify-between">
+          <h3 id="sheet-title" class="text-sm font-extrabold text-[#1D1D1F]">
+            Авторлық құқық және белгісіз авторлар
+          </h3>
+          <button onclick="closeNoticeSheet()" class="w-7 h-7 rounded-full bg-[#F5F5F7] text-xs font-bold text-[#86868B]">✕</button>
+        </div>
+        <p id="sheet-body" class="text-xs text-[#515154] leading-relaxed">
+          Бұл қосымшада тек еркін бөлісуге рұқсат етілген немесе авторы белгісіз қазақша мадақ әндері жинақталған. Егер сіз әннің авторы болсаңыз (немесе авторды білсеңіз), есіміңізді көрсетуді немесе әнді өшіруді сұрай аласыз.
+        </p>
+        <div class="space-y-2">
+          <input
+            id="claim-song"
+            type="text"
+            placeholder="Ән атауы / Song Title"
+            class="w-full bg-[#F5F5F7] rounded-xl px-3.5 py-2.5 text-xs text-[#1D1D1F] focus:outline-none"
+          />
+          <select class="w-full bg-[#F5F5F7] rounded-xl px-3.5 py-2.5 text-xs text-[#1D1D1F] focus:outline-none">
+            <option>Автордың атын қосу / Credit Original Author</option>
+            <option>Әнді қолданбадан өшіру / Request Song Removal</option>
+          </select>
+          <input
+            type="text"
+            placeholder="Telegram / WhatsApp / Email"
+            class="w-full bg-[#F5F5F7] rounded-xl px-3.5 py-2.5 text-xs text-[#1D1D1F] focus:outline-none"
+          />
+          <button
+            onclick="submitClaimDemo()"
+            class="w-full py-2.5 rounded-xl bg-[#FA243C] text-white text-xs font-bold shadow-sm active:scale-[0.99] transition"
+          >
+            Жіберу (Submit Request)
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    const i18n = {
+      kk: {
+        brand: "Қазақша Мадақ",
+        tabListen: "Тыңдау",
+        tabChart: "Топ Чарт",
+        tabOffline: "Офлайн",
+        tabUpload: "Жүктеу",
+        noticeBtn: "Авторлық құқық",
+        searchPlaceholder: "Ән атын немесе сөзін іздеу...",
+        bannerTitle: "Авторы белгісіз және еркін бөлісілетін әндер",
+        bannerSub: "Барлық әндер коммерциялық емес мадақ үшін бөлісілген. Авторды білсеңіз немесе өшіруді сұрасаңыз, осында басыңыз.",
+        playBtn: "Ойнату",
+        shuffleBtn: "Араластыру",
+        topPlayedTitle: "Көп тыңдалған (Top Chart)",
+        allSongsTitle: "Барлық әндер",
+        unknownAuthor: "Белгісіз автор",
+        sharedPerm: "Рұқсатпен бөлісілген",
+        plays: "рет",
+        offlineReady: "Офлайн сақталған (IndexedDB)",
+        offlineEmpty: "Әзірге офлайн сақталған ән жоқ. Кез келген әннің қасындағы ↓ түймесін басыңыз.",
+        uploadTitle: "Жаңа ән жүктеу",
+        uploadConsent: "Бұл әнді еркін бөлісуге рұқсат етілгенін немесе авторы белгісіз екенін растаймын.",
+        closePlayer: "Жабу"
+      },
+      ko: {
+        brand: "카자흐 찬양",
+        tabListen: "지금 듣기",
+        tabChart: "인기 차트",
+        tabOffline: "보관함",
+        tabUpload: "업로드",
+        noticeBtn: "저작권 안내",
+        searchPlaceholder: "찬양 제목 또는 가사 검색...",
+        bannerTitle: "작자 미상 및 무료 나눔 찬양 안내",
+        bannerSub: "공유가 허락되었거나 원작자를 알 수 없는 카자흐 찬양을 비상업적으로 나눕니다. 저작자 표기나 삭제 요청은 여기를 눌러주세요.",
+        playBtn: "재생",
+        shuffleBtn: "임의 재생",
+        topPlayedTitle: "가장 많이 들은 찬양 (Top Chart)",
+        allSongsTitle: "전체 찬양 목록",
+        unknownAuthor: "작자 미상 (Unknown)",
+        sharedPerm: "공유 허락됨",
+        plays: "회 재생",
+        offlineReady: "기기에 오프라인 저장됨 (IndexedDB)",
+        offlineEmpty: "저장된 오프라인 곡이 없습니다. 곡 옆의 ↓ 버튼을 눌러 저장하세요.",
+        uploadTitle: "새 찬양 업로드 (서버 공유)",
+        uploadConsent: "이 곡은 공유가 허락되었거나 작자 미상인 카자흐 찬양곡임을 확인합니다.",
+        closePlayer: "닫기"
+      },
+      en: {
+        brand: "Kazakh Worship",
+        tabListen: "Listen Now",
+        tabChart: "Top Charts",
+        tabOffline: "Offline",
+        tabUpload: "Upload",
+        noticeBtn: "Copyright Notice",
+        searchPlaceholder: "Search songs or lyrics...",
+        bannerTitle: "Unknown Authors & Free Sharing Notice",
+        bannerSub: "Shared non-commercially with permission or unknown authorship. Tap here to credit an author or request removal.",
+        playBtn: "Play",
+        shuffleBtn: "Shuffle",
+        topPlayedTitle: "Most Played Chart",
+        allSongsTitle: "All Worship Songs",
+        unknownAuthor: "Unknown Author",
+        sharedPerm: "Shared with Permission",
+        plays: "plays",
+        offlineReady: "Downloaded in Browser IndexedDB",
+        offlineEmpty: "No offline songs yet. Tap ↓ next to any song to save it for offline playback.",
+        uploadTitle: "Upload Worship Song",
+        uploadConsent: "I confirm this Kazakh worship song is permitted for sharing or has an unknown author.",
+        closePlayer: "Close"
+      },
+      ru: {
+        brand: "Казахские Песни",
+        tabListen: "Слушать",
+        tabChart: "Топ Чарт",
+        tabOffline: "Офлайн",
+        tabUpload: "Загрузить",
+        noticeBtn: "Авторские права",
+        searchPlaceholder: "Поиск песен или текста...",
+        bannerTitle: "Песни с неизвестным автором и свободный доступ",
+        bannerSub: "Некоммерческое распространение. Нажмите здесь, чтобы указать автора или запросить удаление.",
+        playBtn: "Слушать",
+        shuffleBtn: "Перемешать",
+        topPlayedTitle: "Самые прослушиваемые (Топ Чарт)",
+        allSongsTitle: "Все песни хвалы",
+        unknownAuthor: "Неизвестный автор",
+        sharedPerm: "Разрешено к распространению",
+        plays: "прослуш.",
+        offlineReady: "Сохранено офлайн (IndexedDB)",
+        offlineEmpty: "Нет сохраненных песен. Нажмите ↓ рядом с песней для офлайн-доступа.",
+        uploadTitle: "Загрузить песню",
+        uploadConsent: "Подтверждаю, что песня разрешена для распространения или её автор неизвестен.",
+        closePlayer: "Закрыть"
+      }
+    };
+
+    let lang = 'kk';
+    let tab = 'listen';
+    let isPlaying = false;
+    let isShuffle = false;
+    let repeatMode = 'all'; // 'off' | 'all' | 'one'
+    let showLyrics = false;
+    let currentSongId = 1;
+
+    const songs = [
+      {
+        id: 1,
+        title: "Ұлы Құдай (Great God)",
+        unknownAuthor: true,
+        artist: "",
+        duration: "04:12",
+        plays: 1248,
+        offline: true,
+        gradient: "from-[#FA243C] to-[#FF7A00]",
+        lyrics: "Ұлы Құдай, Сені мадақтаймыз,\nЖүректен шыққан алғысты айтамыз.\nАспан мен жер Сенің даңқыңа толы,\nМәңгілік Патшамыз Сенсің, Иеміз!"
+      },
+      {
+        id: 2,
+        title: "Алғыс айтамын Саған",
+        unknownAuthor: true,
+        artist: "",
+        duration: "03:45",
+        plays: 982,
+        offline: true,
+        gradient: "from-[#007AFF] to-[#00C6FF]",
+        lyrics: "Алғыс айтамын Саған, Жаратушым,\nӘрбір таңым үшін, берген тынысың үшін.\nҚайғыда да, қуанышта да,\nСенің рақымың мені қорғайды."
+      },
+      {
+        id: 3,
+        title: "Жаратқан Ием — Тірегім",
+        unknownAuthor: false,
+        artist: "Ерлан (Рұқсатпен)",
+        duration: "05:01",
+        plays: 745,
+        offline: false,
+        gradient: "from-[#AF52DE] to-[#FF2D55]",
+        lyrics: "Жаратқан Ием — менің тірегім,\nСаған ғана сенеді жүрегім.\nДауыл соқса да қорықпаймын,\nҚұтқарушым жанымда әрдайым."
+      },
+      {
+        id: 4,
+        title: "Киелі Рух, келші",
+        unknownAuthor: true,
+        artist: "",
+        duration: "04:38",
+        plays: 619,
+        offline: false,
+        gradient: "from-[#34C759] to-[#00B09B]",
+        lyrics: "Киелі Рух, жүрегімізге келші,\nЖаңа өмір мен тыныштық берші.\nҚазақ даласын нұрыңа бөлеп,\nМахаббатыңды бізге төкші."
+      }
+    ];
+
+    function setLang(newLang) {
+      lang = newLang;
+      ['kk', 'ko', 'en', 'ru'].forEach(l => {
+        const el = document.getElementById('lang-' + l);
+        el.className = l === lang
+          ? "px-2 py-0.5 rounded-md text-xs font-bold bg-white text-[#1D1D1F] shadow-xs transition"
+          : "px-2 py-0.5 rounded-md text-xs font-medium text-[#86868B] transition";
+      });
+
+      const t = i18n[lang];
+      document.getElementById('ui-brand').textContent = t.brand;
+      document.getElementById('ui-tab-listen').textContent = t.tabListen;
+      document.getElementById('ui-tab-chart').textContent = t.tabChart;
+      document.getElementById('ui-tab-offline').textContent = t.tabOffline;
+      document.getElementById('ui-tab-upload').textContent = t.tabUpload;
+      document.getElementById('ui-notice-btn-text').textContent = t.noticeBtn;
+      document.getElementById('search-input').placeholder = t.searchPlaceholder;
+      document.getElementById('ui-banner-title').textContent = t.bannerTitle;
+      document.getElementById('ui-banner-sub').textContent = t.bannerSub;
+      document.getElementById('ui-close-player').textContent = t.closePlayer;
+
+      updatePageTitle();
+      syncPlayerUI();
+      renderView();
+    }
+
+    function updatePageTitle() {
+      const t = i18n[lang];
+      const map = {
+        listen: t.tabListen,
+        chart: t.tabChart,
+        offline: t.tabOffline,
+        upload: t.tabUpload
+      };
+      document.getElementById('ui-page-title').textContent = map[tab];
+    }
+
+    function setTab(newTab) {
+      tab = newTab;
+      ['listen', 'chart', 'offline', 'upload'].forEach(id => {
+        const btn = document.getElementById('tab-' + id);
+        btn.className = id === tab
+          ? "flex flex-col items-center justify-center gap-0.5 text-[#FA243C]"
+          : "flex flex-col items-center justify-center gap-0.5 text-[#86868B]";
+      });
+      document.getElementById('search-box').style.display = (tab === 'upload') ? 'none' : 'block';
+      updatePageTitle();
+      renderView();
+    }
+
+    function renderView() {
+      const t = i18n[lang];
+      const q = (document.getElementById('search-input').value || '').toLowerCase();
+      const container = document.getElementById('view-container');
+
+      if (tab === 'listen') {
+        const top3 = [...songs].sort((a, b) => b.plays - a.plays).slice(0, 3);
+        const filtered = songs.filter(s => s.title.toLowerCase().includes(q) || s.lyrics.toLowerCase().includes(q));
+
+        container.innerHTML = `
+          <!-- Apple Music Play & Shuffle Action Pills -->
+          <div class="grid grid-cols-2 gap-3">
+            <button onclick="playSong(${songs[0].id})" class="py-2.5 rounded-xl bg-[#F5F5F7] active:bg-black/10 text-[#FA243C] font-bold text-xs flex items-center justify-center gap-1.5 transition">
+              <span>▶</span> <span>${t.playBtn}</span>
+            </button>
+            <button onclick="shufflePlayAll()" class="py-2.5 rounded-xl bg-[#F5F5F7] active:bg-black/10 text-[#FA243C] font-bold text-xs flex items-center justify-center gap-1.5 transition">
+              <span>🔀</span> <span>${t.shuffleBtn}</span>
+            </button>
+          </div>
+
+          <!-- Horizontal Top Played Carousel -->
+          <section class="space-y-2.5">
+            <div class="flex items-center justify-between">
+              <h2 class="text-sm font-extrabold tracking-tight text-[#1D1D1F]">${t.topPlayedTitle}</h2>
+              <button onclick="setTab('chart')" class="text-xs font-semibold text-[#FA243C]">Барлығы ›</button>
+            </div>
+            <div class="grid grid-cols-3 gap-2.5">
+              ${top3.map((s, idx) => `
+                <div onclick="playSong(${s.id})" class="cursor-pointer group space-y-1.5">
+                  <div class="aspect-square rounded-2xl bg-gradient-to-br ${s.gradient} p-2.5 flex flex-col justify-between text-white shadow-sm group-active:scale-95 transition">
+                    <span class="self-start px-2 py-0.5 rounded-full bg-black/25 backdrop-blur-xs text-xs font-bold">#${idx + 1}</span>
+                    <span class="text-xs font-bold leading-tight line-clamp-2">${s.title}</span>
+                  </div>
+                  <p class="text-xs font-semibold text-[#1D1D1F] truncate">${s.title}</p>
+                  <p class="text-xs text-[#86868B] truncate">▶ ${s.plays.toLocaleString()} ${t.plays}</p>
+                </div>
+              `).join('')}
+            </div>
+          </section>
+
+          <!-- Apple Music Hairline Song List -->
+          <section class="space-y-1">
+            <h2 class="text-sm font-extrabold tracking-tight text-[#1D1D1F] mb-2">${t.allSongsTitle}</h2>
+            <div class="divide-y divide-black/[0.06]">
+              ${filtered.map(s => renderSongRow(s, null, t)).join('')}
+            </div>
+          </section>
+        `;
+      } else if (tab === 'chart') {
+        const ranked = [...songs].sort((a, b) => b.plays - a.plays);
+        container.innerHTML = `
+          <div class="divide-y divide-black/[0.06]">
+            ${ranked.map((s, idx) => renderSongRow(s, idx + 1, t)).join('')}
+          </div>
+        `;
+      } else if (tab === 'offline') {
+        const saved = songs.filter(s => s.offline);
+        container.innerHTML = `
+          <div class="bg-[#F5F5F7] rounded-2xl p-3 flex items-center justify-between">
+            <span class="text-xs font-semibold text-[#1D1D1F]">📥 ${t.offlineReady}</span>
+            <span class="text-xs font-bold text-[#34C759]">${saved.length} MP3</span>
+          </div>
+          ${saved.length === 0
+            ? `<p class="text-xs text-[#86868B] text-center py-10">${t.offlineEmpty}</p>`
+            : `<div class="divide-y divide-black/[0.06]">${saved.map(s => renderSongRow(s, null, t)).join('')}</div>`
+          }
+        `;
+      } else if (tab === 'upload') {
+        container.innerHTML = `
+          <div class="bg-[#F5F5F7] rounded-2xl p-4 space-y-3.5">
+            <h2 class="text-sm font-extrabold text-[#1D1D1F]">☁️ ${t.uploadTitle}</h2>
+            <input id="up-title" type="text" placeholder="Ән атауы / Song Title *" class="w-full bg-white rounded-xl px-3.5 py-2.5 text-xs border border-black/[0.06] focus:outline-none" />
+            <input id="up-artist" type="text" placeholder="${t.unknownAuthor}" class="w-full bg-white rounded-xl px-3.5 py-2.5 text-xs border border-black/[0.06] focus:outline-none" />
+            <div class="bg-white border border-dashed border-black/15 rounded-xl p-4 text-center text-xs text-[#86868B]">
+              🎵 MP3 / M4A таңдау (Supabase \`kwp-audio/\` + IndexedDB)
+            </div>
+            <textarea id="up-lyrics" rows="3" placeholder="Ән сөзі / Lyrics (Optional)" class="w-full bg-white rounded-xl px-3.5 py-2.5 text-xs border border-black/[0.06] focus:outline-none"></textarea>
+            <label class="flex items-start gap-2 text-xs text-[#515154]">
+              <input type="checkbox" checked class="mt-0.5 accent-[#FA243C]" />
+              <span>${t.uploadConsent}</span>
+            </label>
+            <button onclick="addUploadedSong()" class="w-full py-3 rounded-xl bg-[#FA243C] text-white font-bold text-xs shadow-sm active:scale-[0.99] transition">
+              ＋ ${t.tabUpload}
+            </button>
+          </div>
+        `;
+      }
+    }
+
+    function renderSongRow(s, rank, t) {
+      const active = s.id === currentSongId;
+      const author = s.unknownAuthor ? t.unknownAuthor : s.artist;
+      return `
+        <div class="py-2.5 flex items-center justify-between gap-2.5">
+          <div onclick="playSong(${s.id})" class="flex items-center gap-3 min-w-0 flex-1 cursor-pointer">
+            ${rank ? `<span class="w-5 text-center text-xs font-extrabold ${rank <= 3 ? 'text-[#FA243C]' : 'text-[#86868B]'}">${rank}</span>` : ''}
+            <div class="w-11 h-11 rounded-xl bg-gradient-to-br ${s.gradient} flex items-center justify-center text-white font-bold text-xs shadow-xs shrink-0">
+              ${active && isPlaying ? '❚❚' : '♫'}
+            </div>
+            <div class="min-w-0">
+              <p class="text-xs font-bold ${active ? 'text-[#FA243C]' : 'text-[#1D1D1F]'} truncate">${s.title}</p>
+              <p class="text-xs text-[#86868B] truncate">${author} · ▶ ${s.plays.toLocaleString()}</p>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-1.5 shrink-0">
+            <button
+              onclick="toggleOffline(${s.id})"
+              title="Offline IndexedDB"
+              class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition ${s.offline ? 'bg-[#34C759]/15 text-[#34C759]' : 'bg-[#F5F5F7] text-[#86868B]'}"
+            >
+              ${s.offline ? '✓' : '↓'}
+            </button>
+            <button
+              onclick="openNoticeSheet('${s.title.replace(/'/g, "\\'")}')"
+              class="w-7 h-7 rounded-full bg-[#F5F5F7] text-[#86868B] flex items-center justify-center text-xs font-bold"
+            >
+              •••
+            </button>
+          </div>
+        </div>
+      `;
+    }
+
+    function playSong(id) {
+      if (currentSongId === id) {
+        isPlaying = !isPlaying;
+      } else {
+        currentSongId = id;
+        isPlaying = true;
+        const s = songs.find(x => x.id === id);
+        if (s) s.plays += 1;
+      }
+      syncPlayerUI();
+      renderView();
+    }
+
+    function togglePlay() {
+      isPlaying = !isPlaying;
+      syncPlayerUI();
+      renderView();
+    }
+
+    function shufflePlayAll() {
+      isShuffle = true;
+      const random = songs[Math.floor(Math.random() * songs.length)];
+      currentSongId = random.id;
+      isPlaying = true;
+      syncPlayerUI();
+      renderView();
+    }
+
+    function prevTrack() {
+      const idx = songs.findIndex(x => x.id === currentSongId);
+      currentSongId = songs[(idx - 1 + songs.length) % songs.length].id;
+      isPlaying = true;
+      syncPlayerUI();
+      renderView();
+    }
+
+    function nextTrack() {
+      if (isShuffle) {
+        currentSongId = songs[Math.floor(Math.random() * songs.length)].id;
+      } else {
+        const idx = songs.findIndex(x => x.id === currentSongId);
+        currentSongId = songs[(idx + 1) % songs.length].id;
+      }
+      isPlaying = true;
+      syncPlayerUI();
+      renderView();
+    }
+
+    function toggleOffline(id) {
+      const s = songs.find(x => x.id === id);
+      if (s) s.offline = !s.offline;
+      syncPlayerUI();
+      renderView();
+    }
+
+    function toggleCurrentOffline() {
+      toggleOffline(currentSongId);
+    }
+
+    function toggleShuffle() {
+      isShuffle = !isShuffle;
+      syncPlayerUI();
+    }
+
+    function cycleRepeat() {
+      const order = ['off', 'all', 'one'];
+      repeatMode = order[(order.indexOf(repeatMode) + 1) % order.length];
+      syncPlayerUI();
+    }
+
+    function toggleLyricsView() {
+      showLyrics = !showLyrics;
+      document.getElementById('np-artwork-view').classList.toggle('hidden', showLyrics);
+      document.getElementById('np-lyrics-view').classList.toggle('hidden', !showLyrics);
+      syncPlayerUI();
+    }
+
+    function openFullPlayer() {
+      document.getElementById('full-player-sheet').classList.remove('translate-y-full');
+      syncPlayerUI();
+    }
+
+    function closeFullPlayer() {
+      document.getElementById('full-player-sheet').classList.add('translate-y-full');
+    }
+
+    function openNoticeSheet(songTitle = '') {
+      if (songTitle) document.getElementById('claim-song').value = songTitle;
+      document.getElementById('notice-sheet').classList.remove('hidden');
+    }
+
+    function closeNoticeSheet() {
+      document.getElementById('notice-sheet').classList.add('hidden');
+    }
+
+    function submitClaimDemo() {
+      closeNoticeSheet();
+      alert('Saved to public.kwp_song_reports!');
+    }
+
+    function scrubTo(pct) {
+      document.getElementById('mini-progress').style.width = pct + '%';
+      const total = 252;
+      const cur = Math.floor((pct / 100) * total);
+      const rem = total - cur;
+      const fmt = s => String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
+      document.getElementById('np-cur-time').textContent = fmt(cur);
+      document.getElementById('np-rem-time').textContent = '-' + fmt(rem);
+    }
+
+    function addUploadedSong() {
+      const titleEl = document.getElementById('up-title');
+      const artistEl = document.getElementById('up-artist');
+      const lyricsEl = document.getElementById('up-lyrics');
+      const title = (titleEl && titleEl.value.trim()) || "Жаңа Мадақ Әні";
+      const artist = (artistEl && artistEl.value.trim()) || "";
+      songs.unshift({
+        id: Date.now(),
+        title,
+        unknownAuthor: !artist,
+        artist,
+        duration: "03:50",
+        plays: 1,
+        offline: true,
+        gradient: "from-[#FA243C] to-[#AF52DE]",
+        lyrics: (lyricsEl && lyricsEl.value.trim()) || "Жаңа жүктелген мадақ әні..."
+      });
+      setTab('listen');
+    }
+
+    function syncPlayerUI() {
+      const s = songs.find(x => x.id === currentSongId) || songs[0];
+      const t = i18n[lang];
+      const author = s.unknownAuthor ? t.unknownAuthor : s.artist;
+
+      document.getElementById('mini-title').textContent = s.title;
+      document.getElementById('mini-artist').textContent = `${author} · ${s.offline ? 'IndexedDB ✓' : 'Stream'}`;
+      document.getElementById('mini-play-btn').textContent = isPlaying ? '⏸' : '▶';
+      document.getElementById('mini-art').className = `w-10 h-10 rounded-xl bg-gradient-to-br ${s.gradient} flex items-center justify-center text-white font-bold text-sm shadow-sm shrink-0`;
+
+      document.getElementById('np-title').textContent = s.title;
+      document.getElementById('np-art-title').textContent = s.title;
+      document.getElementById('np-artist').textContent = author;
+      document.getElementById('np-plays-pill').textContent = `▶ ${s.plays.toLocaleString()} ${t.plays}`;
+      document.getElementById('np-play-btn').textContent = isPlaying ? '⏸' : '▶';
+      document.getElementById('np-lyrics-text').textContent = s.lyrics;
+
+      const artBox = document.getElementById('np-artwork-box');
+      artBox.className = `am-spring ${isPlaying ? 'scale-100' : 'scale-90 opacity-90'} w-56 h-56 rounded-3xl bg-gradient-to-br ${s.gradient} shadow-[0_20px_50px_rgba(250,36,60,0.25)] flex flex-col items-center justify-center text-white p-6 text-center`;
+
+      const offBtn = document.getElementById('np-offline-btn');
+      offBtn.textContent = s.offline ? '✓ IndexedDB' : '↓ Offline';
+      offBtn.className = s.offline
+        ? "px-3 py-1.5 rounded-full text-xs font-bold bg-[#34C759]/15 text-[#34C759] shrink-0 transition"
+        : "px-3 py-1.5 rounded-full text-xs font-semibold bg-[#F5F5F7] text-[#1D1D1F] shrink-0 transition";
+
+      const shufPill = document.getElementById('pill-shuffle');
+      shufPill.className = isShuffle
+        ? "py-2 rounded-xl bg-[#FA243C] text-white text-xs font-bold flex items-center justify-center gap-1 transition"
+        : "py-2 rounded-xl bg-[#F5F5F7] text-[#1D1D1F] text-xs font-semibold flex items-center justify-center gap-1 transition";
+
+      const repPill = document.getElementById('pill-repeat');
+      if (repeatMode === 'off') {
+        repPill.textContent = '🔁 Off';
+        repPill.className = "py-2 rounded-xl bg-[#F5F5F7] text-[#86868B] text-xs font-semibold flex items-center justify-center gap-1 transition";
+      } else if (repeatMode === 'all') {
+        repPill.textContent = '🔁 All';
+        repPill.className = "py-2 rounded-xl bg-[#FA243C]/15 text-[#FA243C] text-xs font-bold flex items-center justify-center gap-1 transition";
+      } else {
+        repPill.textContent = '🔂 One';
+        repPill.className = "py-2 rounded-xl bg-[#FA243C] text-white text-xs font-bold flex items-center justify-center gap-1 transition";
+      }
+    }
+
+    setLang('kk');
+    setTab('listen');
+  </script>
+</body>
+</html>
