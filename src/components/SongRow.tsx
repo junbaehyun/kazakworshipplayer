@@ -1,4 +1,4 @@
-import { Check, Download, ListCheck, ListPlus, MoreHorizontal, Music2, Pause, Play } from 'lucide-react';
+import { Check, Download, ListCheck, ListPlus, Music2, Pause, Play } from 'lucide-react';
 import type { TranslationStrings } from '../i18n/translations';
 import type { Song } from '../types';
 
@@ -28,7 +28,7 @@ interface SongRowProps {
   onPlay: (song: Song) => void;
   onToggleOffline: (song: Song) => void;
   onTogglePlaylist?: (song: Song) => void;
-  onOpenReport: (song: Song) => void;
+  onOpenReport?: (song: Song) => void;
 }
 
 export function SongRow({
@@ -43,7 +43,6 @@ export function SongRow({
   onPlay,
   onToggleOffline,
   onTogglePlaylist,
-  onOpenReport,
 }: SongRowProps) {
   const authorLabel = song.is_unknown_author ? t.unknownAuthor : song.artist;
   const gradient = getSongGradient(song.id);
@@ -129,15 +128,6 @@ export function SongRow({
           ) : (
             <Download className="w-3.5 h-3.5" />
           )}
-        </button>
-
-        <button
-          type="button"
-          onClick={() => onOpenReport(song)}
-          title={t.claimAuthorBtn}
-          className="w-8 h-8 rounded-full bg-[#F5F5F7] text-[#86868B] flex items-center justify-center active:bg-black/10 transition"
-        >
-          <MoreHorizontal className="w-4 h-4" />
         </button>
       </div>
     </div>
