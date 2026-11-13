@@ -69,6 +69,10 @@ export interface TranslationStrings {
   adminResolveBtn: string;
   noSongsFound: string;
   contactEmailLabel: string;
+  installTitle: string;
+  installSub: string;
+  installBtn: string;
+  installIosHint: string;
 }
 
 export const translations: Record<Language, TranslationStrings> = {
@@ -140,7 +144,11 @@ export const translations: Record<Language, TranslationStrings> = {
     adminDeleteBtn: 'Өшіру',
     adminResolveBtn: 'Орындалды',
     noSongsFound: 'Әндер табылмады.',
-    contactEmailLabel: 'Байланыс поштасы:'
+    contactEmailLabel: 'Байланыс поштасы:',
+    installTitle: 'Қолданбаны орнату',
+    installSub: 'Офлайн тыңдау және жылдам ашу үшін негізгі экранға қосыңыз.',
+    installBtn: 'Орнату',
+    installIosHint: 'Safari-де Бөлісу (↑) → «Басты экранға» басыңыз.'
   },
   ko: {
     brand: '카자흐 찬양',
@@ -210,7 +218,11 @@ export const translations: Record<Language, TranslationStrings> = {
     adminDeleteBtn: '삭제',
     adminResolveBtn: '처리 완료',
     noSongsFound: '검색된 찬양이 없습니다.',
-    contactEmailLabel: '문의 이메일:'
+    contactEmailLabel: '문의 이메일:',
+    installTitle: '앱으로 설치하기',
+    installSub: '오프라인 재생과 빠른 실행을 위해 홈 화면에 추가하세요.',
+    installBtn: '설치',
+    installIosHint: 'Safari 하단 공유(↑) → "홈 화면에 추가"를 눌러주세요.'
   },
   en: {
     brand: 'Kazakh Worship',
@@ -280,7 +292,11 @@ export const translations: Record<Language, TranslationStrings> = {
     adminDeleteBtn: 'Delete',
     adminResolveBtn: 'Resolve',
     noSongsFound: 'No songs found.',
-    contactEmailLabel: 'Contact Email:'
+    contactEmailLabel: 'Contact Email:',
+    installTitle: 'Install App',
+    installSub: 'Add to your home screen for offline playback & native feel.',
+    installBtn: 'Install',
+    installIosHint: 'In Safari, tap Share (↑) → "Add to Home Screen".'
   },
   ru: {
     brand: 'Казахские Песни',
@@ -350,6 +366,10 @@ export const translations: Record<Language, TranslationStrings> = {
     adminDeleteBtn: 'Удалить',
     adminResolveBtn: 'Решено',
     noSongsFound: 'Песни не найдены.',
-    contactEmailLabel: 'Почта для связи:'
+    contactEmailLabel: 'Почта для связи:',
+    installTitle: 'Установить приложение',
+    installSub: 'Добавьте на главный экран для быстрого доступа и офлайн-режима.',
+    installBtn: 'Установить',
+    installIosHint: 'В Safari нажмите «Поделиться» (↑) → «На экран «Домой».'
   }
 };

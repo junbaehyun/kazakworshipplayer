@@ -12,6 +12,7 @@ import {
   Trophy,
 } from 'lucide-react';
 import { FullPlayerSheet } from './components/FullPlayerSheet';
+import { InstallPromptBanner } from './components/InstallPromptBanner';
 import { MiniPlayer } from './components/MiniPlayer';
 import { NoticeReportSheet } from './components/NoticeReportSheet';
 import { SettingsAdminView } from './components/SettingsAdminView';
@@ -217,6 +218,7 @@ export function App() {
           {/* TAB 1: LISTEN NOW */}
           {tab === 'listen' && (
             <>
+              <InstallPromptBanner t={t} />
               {publishedSongs.length > 0 && (
                 <div className="grid grid-cols-2 gap-3">
                   <button

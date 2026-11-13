@@ -1,18 +1,39 @@
 {
+  "id": "/",
   "name": "Қазақша Мадақ — Kazakh Worship Player",
   "short_name": "Қазақша Мадақ",
   "description": "Community-shared Kazakh worship songs player with offline storage and Most Played chart.",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#FFFFFF",
-  "theme_color": "#FA243C",
+  "theme_color": "#FFFFFF",
   "orientation": "portrait",
+  "categories": ["music", "lifestyle"],
   "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
     {
       "src": "/icon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "purpose": "any"
     }
   ]
 }
