@@ -340,3 +340,121 @@ SELECT
     E'Патшалық салтанат\nҰлылық жарқырап\nБәрі ән салсын\nҒаламға жар салсын!\nӨзін нұрға бөлеп\nЖасырынды түнек\nЕстіп үнін Оның,\nЕстіп үнін Оның\n\nИеміз - ұлы!\nӘнге сал бірге, Ол - ұлы!\nБарлығы көрсін,\nБілсін Ол - ұлы!\n\nҒасырдан ғасырға\nБарлығы қолында\nБасы Ол соңы да, басы Ол соңы да\nҮшбірліктегі Ол\nӘке Рух және Ұл\n«Арыстан» да Өзі\nКелген болып «Қозы»\n\nЕсімі ең жоғары\nБар мадаққа лайықты,\nЖан дүнием жырласын,\nОл - ұлы!',
     152, 'developer', 'published', true
 WHERE NOT EXISTS (SELECT 1 FROM public.kwp_songs WHERE audio_url = 'https://repo.worshipleaderapp.com/mp3/04%20Patshalyk_%20saltanat%20Track%204.mp3');
+
+-- 9. Seed ranks #12-#21 (up to Top 20)
+INSERT INTO public.kwp_songs (title, artist, is_unknown_author, permission_note, audio_url, storage_path, duration_seconds, lyrics, play_count, uploaded_by, status, is_active)
+SELECT
+    'Барлық аспан',
+    'Noel Richards, Tricia Richards',
+    false,
+    'Top #12 Kazakh worship (#5828 · worshipleaderapp.com)',
+    'https://repo.worshipleaderapp.com/mp3/Barlikaspan.mp3',
+    NULL,
+    266,
+    E'Барлық аспан атыңды мадақтайды Ием.\nСенің көркің немен теңеседі екен.\n\nМәңгі отырасың (Мәңгі отырасың)\nЖарқыраған тақта. (Жарқыраған тақта.)\nТек Сенің алдыңда (Тек Сенің алдыңда)\nТізе бүгемін мен !\n\nМадақтаймын Сенің даңқыңды жан Ием,\nСен біз үшін өміріңді құрбан еттің.\n\nАялаймын Сенің Сөзіңді жан Ием.\nЖаратушым, бір Өзіңе дұға етем.',
+    149, 'developer', 'published', true
+WHERE NOT EXISTS (SELECT 1 FROM public.kwp_songs WHERE audio_url = 'https://repo.worshipleaderapp.com/mp3/Barlikaspan.mp3');
+
+INSERT INTO public.kwp_songs (title, artist, is_unknown_author, permission_note, audio_url, storage_path, duration_seconds, lyrics, play_count, uploaded_by, status, is_active)
+SELECT
+    'Атың Мадақталсын',
+    'Matt & Beth Redman (Ауд. Нұржан Төлеген)',
+    false,
+    'Top #13 Kazakh worship (#7681 · worshipleaderapp.com)',
+    'https://repo.worshipleaderapp.com/mp3/01%20Track%201.mp3',
+    NULL,
+    220,
+    E'Атың мадақталсын\nОрман тауым көлімде\nЖер мен аспан төрінде\nАтың мадақталсын!\n\nАтың мадақталсын\nШексіз мына ғаламда\nЖүрегім ой санамда\nАтың мадақталсын!\n\nӘрбір атқан таңым үшін мадақтаймын\nЕсіміңді бар әлемге жариялаймын!\n\nАтың мадақталсын Тәңір\nМәңгі мадақталсын\nӨзіңмен ғажап біздің өмір\nКиелі есімің даңқталсын!\n\nАтың Мадақталсын\nБиік шыңға жетсем де\nТерең құзға кетсем де\nАтың Мадақталсын\n\nАтың мадақталсын\nҚандай сыннан өтсемде\nШаттыққа кенелсем де\nАтың мадақталсын\n\n// Беретін де Сенсің Ием! алатын да Сенсің Ием!\nҚұдіретің мен еркіңе, мен басымды Ием! //',
+    146, 'developer', 'published', true
+WHERE NOT EXISTS (SELECT 1 FROM public.kwp_songs WHERE audio_url = 'https://repo.worshipleaderapp.com/mp3/01%20Track%201.mp3');
+
+INSERT INTO public.kwp_songs (title, artist, is_unknown_author, permission_note, audio_url, storage_path, duration_seconds, lyrics, play_count, uploaded_by, status, is_active)
+SELECT
+    'Құрметтеймін Сені балаңдай',
+    'Белгісіз автор',
+    true,
+    'Top #15 Kazakh worship (#5959 · worshipleaderapp.com)',
+    'https://repo.worshipleaderapp.com/mp3/05%20K_u_rmetteimin%20Seni%20balan_dai%20Track%2005.mp3',
+    NULL,
+    231,
+    E'Құрметтеймін Сені балаңдай,\nМадақтаймын әнменен тынбай.\nЖар болшы маған Тәңір,\nАдалсың Сен мәңгі.\n\nҚараңғыдан шығарған,\nРақымын мол сыйлаған,\nКүнәмді кешіріп, өлімнен мені құтқарған.\n\nҚұтқарушым менің, мен Сені сүйемін.\nСаған мәңгі ризамын.\nЖан-тәніммен Сені, Иса, жалғыз Сені,\nМен мадақтаймын!\n\nҚұтқарушым менің, мен Сені сүйемін.\nКешірші деп сұраймын.\nМейірімді Иемді, жақсы адал Иемді,\nМәңгі жырлаймын, мәңгі жырлаймын.\n\nӘн саламын қуанғанымнан,\nЕшқашан кетпеші жанымнан.\nПанам болшы, О, Тәңір,\nАдалсын Сен мәңгі.\n\nТіршілікті жаратқан,\nОйын іске асырған.\nӨзін құрметтеген адамға\nЖаны ашыған.',
+    143, 'developer', 'published', true
+WHERE NOT EXISTS (SELECT 1 FROM public.kwp_songs WHERE audio_url = 'https://repo.worshipleaderapp.com/mp3/05%20K_u_rmetteimin%20Seni%20balan_dai%20Track%2005.mp3');
+
+INSERT INTO public.kwp_songs (title, artist, is_unknown_author, permission_note, audio_url, storage_path, duration_seconds, lyrics, play_count, uploaded_by, status, is_active)
+SELECT
+    'Қайғы тартып қиналғанда',
+    'Шынтеміров Әбілхайыр',
+    false,
+    'Top #16 Kazakh worship (#5964 · worshipleaderapp.com)',
+    'https://repo.worshipleaderapp.com/mp3/KaigitartipKinalganda.mp3',
+    NULL,
+    166,
+    E'Қайғы тартып қиналғанда\nЖол таба алмай адасқанда,\nБір Өзіңе келдім Әке,\nКөрінбейтін болсаң да.\n\nҚараңғыда жатқанымда,\nКүнәға әбден батқанымда\nБар екенсің сездім Әке,\nКөрінбейтін болсаң да.\n\nКөрінбейтін Көктегі Әке,\nБір Өзіңе сиынамын мен.\nЖүрегімнен шыққан осы әніммен,\nБар әлемді жаратқан Ием,\nАспаннан нан жаудыртқан Ием,\n// Көрінбейтін Көктегі менің Әкем. //\n\nЖан жүрегім жылағанда,\nӘлсізденіп құлағанда,\nҰмтыламын Саған Әке,\nКөрінбейтін болсаң да.\n\nӨзің мені құтқарғанда,\nКөңілімді жұбатқанда.\nБасымды идім Саған Әке,\nКөрінбейтін болсаң да.',
+    140, 'developer', 'published', true
+WHERE NOT EXISTS (SELECT 1 FROM public.kwp_songs WHERE audio_url = 'https://repo.worshipleaderapp.com/mp3/KaigitartipKinalganda.mp3');
+
+INSERT INTO public.kwp_songs (title, artist, is_unknown_author, permission_note, audio_url, storage_path, duration_seconds, lyrics, play_count, uploaded_by, status, is_active)
+SELECT
+    'Қымбатсың Сен маған әр күнде',
+    'Майя Рахимгалиева',
+    false,
+    'Top #17 Kazakh worship (#5946 · worshipleaderapp.com)',
+    'https://repo.worshipleaderapp.com/mp3/KimbatsinSen.mp3',
+    NULL,
+    256,
+    E'// Қымбатсың Сен маған әр күнде,\nҚымбатсың Сен әрқашан күтем Сені Иса, жүрегім аңсайды Сені.\nСенімен боламын мәңгіге! //\n\n// Мен Саған өмірімді арнаймын,\nИса, мені Сен қолданшы.\nӘр күнде Сөзіңе ұмтыламын,\nТәңірім Саған мен сенемін. //',
+    138, 'developer', 'published', true
+WHERE NOT EXISTS (SELECT 1 FROM public.kwp_songs WHERE audio_url = 'https://repo.worshipleaderapp.com/mp3/KimbatsinSen.mp3');
+
+INSERT INTO public.kwp_songs (title, artist, is_unknown_author, permission_note, audio_url, storage_path, duration_seconds, lyrics, play_count, uploaded_by, status, is_active)
+SELECT
+    'Сен, Тәңірім, күмістен де асыл',
+    'DSJ',
+    false,
+    'Top #18 Kazakh worship (#6014 · worshipleaderapp.com)',
+    'https://repo.worshipleaderapp.com/mp3/145%20Sen_%20T_n_irim_%20kumisten%20de%20asyl..mp3',
+    NULL,
+    178,
+    E'Сен, Тәңірім, күмістен де асыл,\nСен, Тәңірім, алтыннан да қымбат.\nСен, Тәңірім, асылдың асылы.\nСен, Бағушым, менің Құдайым!\n\n// Сенен басқа Құтқарушым жоқ,\nСенен басқа арманым да жоқ,\nСенен басқа үмітім де жоқ.\nСен менің Құдайым! //',
+    136, 'developer', 'published', true
+WHERE NOT EXISTS (SELECT 1 FROM public.kwp_songs WHERE audio_url = 'https://repo.worshipleaderapp.com/mp3/145%20Sen_%20T_n_irim_%20kumisten%20de%20asyl..mp3');
+
+INSERT INTO public.kwp_songs (title, artist, is_unknown_author, permission_note, audio_url, storage_path, duration_seconds, lyrics, play_count, uploaded_by, status, is_active)
+SELECT
+    'Тәңір Ием арамызда',
+    'Блане Моррис',
+    false,
+    'Top #19 Kazakh worship (#6042 · worshipleaderapp.com)',
+    'https://repo.worshipleaderapp.com/mp3/06%20_T_n_ir%20Iem%20aramyzda%20%20Dorozhka%206.mp3',
+    NULL,
+    316,
+    E'// Тәңір Ием арамызда,\nКиелі, Киелі! //\n\n// Жоғарыда Ол мадақталсын\nҚұдіретті күшпен, қуанышпен.\nБилік етсін арамызда\nБүгіннен, мәңгіге, Аумин! //',
+    134, 'developer', 'published', true
+WHERE NOT EXISTS (SELECT 1 FROM public.kwp_songs WHERE audio_url = 'https://repo.worshipleaderapp.com/mp3/06%20_T_n_ir%20Iem%20aramyzda%20%20Dorozhka%206.mp3');
+
+INSERT INTO public.kwp_songs (title, artist, is_unknown_author, permission_note, audio_url, storage_path, duration_seconds, lyrics, play_count, uploaded_by, status, is_active)
+SELECT
+    'Жол Ғолғотаға алыс, қиналып қарадың',
+    'Белгісіз автор',
+    true,
+    'Top #20 Kazakh worship (#5860 · worshipleaderapp.com)',
+    'https://repo.worshipleaderapp.com/mp3/59.%20Zhol%20G_olg_otag_a%20alys_%20k_inalyp%20k_aradyn_.mp3',
+    NULL,
+    256,
+    E'Жол Ғолғотаға алыс, қиналып қарадың,\nЖараңнан тамшылап қаның ақты.\nО, Иса қымбаттым, мен үшін қиналдың,\nАзабын Өз еркіңмен көрдің.\n\nЕшқашан ұмытпаймын айқасқан ағашты,\nБайланыстырдың көк пенен жерді.\nӨлімің жарастырды бізді Құдаймен,\nТаза қаның бізді өтеді.\n\nАдамзат зер салшы, әнімді тыңдашы,\nНе үміт күтесің дүниеден.\nТөгілген қанына не төлем бересің,\nРақымы Құдайдың бағасыз.\n\nРақымдылығыңды Сен жерге жаудырдың,\nСоның сырын ашшы Сен бізге.\nНұсқаған жолыңмен қорықпай жүрейін,\nӨмірдің әр-қилы кезінде.',
+    133, 'developer', 'published', true
+WHERE NOT EXISTS (SELECT 1 FROM public.kwp_songs WHERE audio_url = 'https://repo.worshipleaderapp.com/mp3/59.%20Zhol%20G_olg_otag_a%20alys_%20k_inalyp%20k_aradyn_.mp3');
+
+INSERT INTO public.kwp_songs (title, artist, is_unknown_author, permission_note, audio_url, storage_path, duration_seconds, lyrics, play_count, uploaded_by, status, is_active)
+SELECT
+    'Қолымды көкке жайып',
+    'Белгісіз автор',
+    true,
+    'Top #21 Kazakh worship (#5971 · worshipleaderapp.com)',
+    'https://repo.worshipleaderapp.com/mp3/13%20Track%2013.mp3',
+    NULL,
+    449,
+    E'// Қолымды көкке жайып\nСүйем Сені.\nҚұтқардың азат еттің Ием менің.\nЖер көкте сиынарым бір Өзіңсің.\nӨмірдің болмас сірә Сенсіз сәні. //\n\nСүйемін Сені Иса, сүйем Сені.\nСүйемін Сені Иса, сүйем Сені Иса.',
+    131, 'developer', 'published', true
+WHERE NOT EXISTS (SELECT 1 FROM public.kwp_songs WHERE audio_url = 'https://repo.worshipleaderapp.com/mp3/13%20Track%2013.mp3');
