@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import {
   CloudUpload,
@@ -16,7 +16,7 @@ import { InstallPromptBanner } from './components/InstallPromptBanner';
 import { MiniPlayer } from './components/MiniPlayer';
 import { NoticeReportSheet } from './components/NoticeReportSheet';
 import { SettingsAdminView } from './components/SettingsAdminView';
-import { getSongGradient, SongRow } from './components/SongRow';
+import { SongRow } from './components/SongRow';
 import { UploadView } from './components/UploadView';
 import { useAudioPlayer } from './hooks/useAudioPlayer';
 import { translations } from './i18n/translations';
@@ -29,6 +29,7 @@ import { fetchAndCacheAudioBlob, fetchSongs, getAdminSession, supabase } from '.
 import type { Language, Song, TabId } from './types';
 
 const LANGS: Language[] = ['kk', 'ko', 'en', 'ru'];
+const PLAYLIST_KEY = 'kwp_playlist_ids_v1';
 
 export function App() {
   const [lang, setLang] = useState<Language>(() => {
@@ -38,6 +39,15 @@ export function App() {
   const [tab, setTab] = useState<TabId>('listen');
   const [search, setSearch] = useState('');
   const [songs, setSongs] = useState<Song[]>([]);
+  const [playlistIds, setPlaylistIds] = useState<string[]>(() => {
+    try {
+      const raw = localStorage.getItem(PLAYLIST_KEY);
+      const parsed = raw ? (JSON.parse(raw) as unknown) : [];
+      return Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === 'string') : [];
+    } catch {
+      return [];
+    }
+  });
   const [offlineIds, setOfflineIds] = useState<string[]>([]);
   const [offlineBytes, setOfflineBytes] = useState<number>(0);
   const [savingOfflineId, setSavingOfflineId] = useState<string | null>(null);
@@ -45,6 +55,7 @@ export function App() {
   const [noticeOpen, setNoticeOpen] = useState(false);
   const [reportTargetSong, setReportTargetSong] = useState<Song | null>(null);
   const [session, setSession] = useState<Session | null>(null);
+  const hasAutoLoadedRef = useRef(false);
 
   const t = translations[lang];
 
@@ -85,10 +96,51 @@ export function App() {
     );
   }, []);
 
+  const handleTogglePlaylist = useCallback((song: Song) => {
+    setPlaylistIds((prev) => {
+      const next = prev.includes(song.id)
+        ? prev.filter((id) => id !== song.id)
+        : [song.id, ...prev];
+      try {
+        localStorage.setItem(PLAYLIST_KEY, JSON.stringify(next));
+      } catch {
+        // Ignore storage errors
+      }
+      return next;
+    });
+  }, []);
+
+  const publishedSongs = useMemo(
+    () => songs.filter((s) => s.status === 'published' && s.is_active),
+    [songs]
+  );
+
+  const playlistSongs = useMemo(() => {
+    const byId = new Map(publishedSongs.map((s) => [s.id, s]));
+    return playlistIds.map((id) => byId.get(id)).filter((s): s is Song => Boolean(s));
+  }, [publishedSongs, playlistIds]);
+
+  const offlineOnlySongs = useMemo(
+    () => publishedSongs.filter((s) => offlineIds.includes(s.id)),
+    [publishedSongs, offlineIds]
+  );
+
+  const libraryQueue = useMemo(() => {
+    if (playlistSongs.length > 0) return playlistSongs;
+    if (offlineOnlySongs.length > 0) return offlineOnlySongs;
+    return publishedSongs;
+  }, [playlistSongs, offlineOnlySongs, publishedSongs]);
+
   const player = useAudioPlayer({
-    songs,
+    songs: libraryQueue,
     onPlayCountUpdated: handlePlayCountUpdated,
   });
+
+  useEffect(() => {
+    if (hasAutoLoadedRef.current || libraryQueue.length === 0 || player.currentSong) return;
+    hasAutoLoadedRef.current = true;
+    void player.playSong(libraryQueue[0]);
+  }, [libraryQueue, player]);
 
   const handleToggleOffline = async (song: Song) => {
     if (offlineIds.includes(song.id)) {
@@ -112,11 +164,6 @@ export function App() {
     await clearAllOfflineBlobs();
     await refreshOfflineStats();
   };
-
-  const publishedSongs = useMemo(
-    () => songs.filter((s) => s.status === 'published' && s.is_active),
-    [songs]
-  );
 
   const filteredSongs = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -219,11 +266,11 @@ export function App() {
           {tab === 'listen' && (
             <>
               <InstallPromptBanner t={t} />
-              {publishedSongs.length > 0 && (
+              {libraryQueue.length > 0 && (
                 <div className="grid grid-cols-2 gap-3">
                   <button
                     type="button"
-                    onClick={() => void player.playSong(publishedSongs[0])}
+                    onClick={() => void player.playSong(libraryQueue[0])}
                     className="py-2.5 rounded-xl bg-[#F5F5F7] active:bg-black/10 text-[#FA243C] font-bold text-xs flex items-center justify-center gap-1.5 transition"
                   >
                     <Play className="w-3.5 h-3.5 fill-[#FA243C]" />
@@ -233,7 +280,7 @@ export function App() {
                     type="button"
                     onClick={() => {
                       if (!player.isShuffle) player.toggleShuffle();
-                      const pick = publishedSongs[Math.floor(Math.random() * publishedSongs.length)];
+                      const pick = libraryQueue[Math.floor(Math.random() * libraryQueue.length)];
                       if (pick) void player.playSong(pick);
                     }}
                     className="py-2.5 rounded-xl bg-[#F5F5F7] active:bg-black/10 text-[#FA243C] font-bold text-xs flex items-center justify-center gap-1.5 transition"
@@ -244,47 +291,36 @@ export function App() {
                 </div>
               )}
 
-              {/* Top 3 Carousel */}
-              {topChartSongs.length > 0 && (
-                <section className="space-y-2.5">
-                  <div className="flex items-center justify-between">
+              {/* My Playlist Section */}
+              {!search.trim() && playlistSongs.length > 0 && (
+                <section className="space-y-1">
+                  <div className="flex items-center justify-between mb-1">
                     <h2 className="text-sm font-extrabold tracking-tight text-[#1D1D1F]">
-                      {t.topPlayedTitle}
+                      {t.myPlaylistTitle}
                     </h2>
-                    <button
-                      type="button"
-                      onClick={() => setTab('chart')}
-                      className="text-xs font-semibold text-[#FA243C]"
-                    >
-                      {t.seeAll} ›
-                    </button>
+                    <span className="text-xs font-bold text-[#FA243C]">
+                      {playlistSongs.length}
+                    </span>
                   </div>
-
-                  <div className="grid grid-cols-3 gap-2.5">
-                    {topChartSongs.slice(0, 3).map((s, idx) => (
-                      <button
-                        key={s.id}
-                        type="button"
-                        onClick={() => void player.playSong(s)}
-                        className="text-left group space-y-1.5"
-                      >
-                        <div
-                          className={`aspect-square rounded-2xl bg-gradient-to-br ${getSongGradient(
-                            s.id
-                          )} p-2.5 flex flex-col justify-between text-white shadow-sm group-active:scale-95 transition`}
-                        >
-                          <span className="self-start px-2 py-0.5 rounded-full bg-black/25 text-xs font-bold">
-                            #{idx + 1}
-                          </span>
-                          <span className="text-xs font-bold leading-tight line-clamp-2">
-                            {s.title}
-                          </span>
-                        </div>
-                        <p className="text-xs font-semibold text-[#1D1D1F] truncate">{s.title}</p>
-                        <p className="text-xs text-[#86868B] truncate">
-                          ▶ {s.play_count.toLocaleString()} {t.plays}
-                        </p>
-                      </button>
+                  <div className="divide-y divide-black/[0.06]">
+                    {playlistSongs.map((s) => (
+                      <SongRow
+                        key={`pl-${s.id}`}
+                        song={s}
+                        isCurrent={player.currentSong?.id === s.id}
+                        isPlaying={player.isPlaying}
+                        isOffline={offlineIds.includes(s.id)}
+                        isSavingOffline={savingOfflineId === s.id}
+                        isInPlaylist={true}
+                        t={t}
+                        onPlay={(song) => void player.playSong(song)}
+                        onToggleOffline={(song) => void handleToggleOffline(song)}
+                        onTogglePlaylist={handleTogglePlaylist}
+                        onOpenReport={(song) => {
+                          setReportTargetSong(song);
+                          setNoticeOpen(true);
+                        }}
+                      />
                     ))}
                   </div>
                 </section>
@@ -307,9 +343,11 @@ export function App() {
                         isPlaying={player.isPlaying}
                         isOffline={offlineIds.includes(s.id)}
                         isSavingOffline={savingOfflineId === s.id}
+                        isInPlaylist={playlistIds.includes(s.id)}
                         t={t}
                         onPlay={(song) => void player.playSong(song)}
                         onToggleOffline={(song) => void handleToggleOffline(song)}
+                        onTogglePlaylist={handleTogglePlaylist}
                         onOpenReport={(song) => {
                           setReportTargetSong(song);
                           setNoticeOpen(true);
@@ -340,9 +378,11 @@ export function App() {
                     isPlaying={player.isPlaying}
                     isOffline={offlineIds.includes(s.id)}
                     isSavingOffline={savingOfflineId === s.id}
+                    isInPlaylist={playlistIds.includes(s.id)}
                     t={t}
                     onPlay={(song) => void player.playSong(song)}
                     onToggleOffline={(song) => void handleToggleOffline(song)}
+                    onTogglePlaylist={handleTogglePlaylist}
                     onOpenReport={(song) => {
                       setReportTargetSong(song);
                       setNoticeOpen(true);
@@ -352,37 +392,75 @@ export function App() {
             </div>
           )}
 
-          {/* TAB 3: OFFLINE */}
+          {/* TAB 3: OFFLINE & LIBRARY */}
           {tab === 'offline' && (
-            <div className="space-y-3">
-              <div className="bg-[#F5F5F7] rounded-2xl p-3 flex items-center justify-between">
-                <span className="text-xs font-semibold text-[#1D1D1F]">📥 {t.offlineReady}</span>
-                <span className="text-xs font-bold text-[#34C759]">{offlineSongs.length} MP3</span>
-              </div>
-
-              {offlineSongs.length === 0 ? (
-                <p className="text-xs text-[#86868B] text-center py-10">{t.offlineEmpty}</p>
-              ) : (
-                <div className="divide-y divide-black/[0.06]">
-                  {offlineSongs.map((s) => (
-                    <SongRow
-                      key={s.id}
-                      song={s}
-                      isCurrent={player.currentSong?.id === s.id}
-                      isPlaying={player.isPlaying}
-                      isOffline={true}
-                      isSavingOffline={savingOfflineId === s.id}
-                      t={t}
-                      onPlay={(song) => void player.playSong(song)}
-                      onToggleOffline={(song) => void handleToggleOffline(song)}
-                      onOpenReport={(song) => {
-                        setReportTargetSong(song);
-                        setNoticeOpen(true);
-                      }}
-                    />
-                  ))}
+            <div className="space-y-5">
+              {/* My Playlist */}
+              <section className="space-y-2">
+                <div className="bg-[#F5F5F7] rounded-2xl p-3 flex items-center justify-between">
+                  <span className="text-xs font-semibold text-[#1D1D1F]">🎵 {t.myPlaylistTitle}</span>
+                  <span className="text-xs font-bold text-[#FA243C]">{playlistSongs.length}</span>
                 </div>
-              )}
+                {playlistSongs.length === 0 ? (
+                  <p className="text-xs text-[#86868B] text-center py-4">{t.playlistEmpty}</p>
+                ) : (
+                  <div className="divide-y divide-black/[0.06]">
+                    {playlistSongs.map((s) => (
+                      <SongRow
+                        key={`lib-pl-${s.id}`}
+                        song={s}
+                        isCurrent={player.currentSong?.id === s.id}
+                        isPlaying={player.isPlaying}
+                        isOffline={offlineIds.includes(s.id)}
+                        isSavingOffline={savingOfflineId === s.id}
+                        isInPlaylist={true}
+                        t={t}
+                        onPlay={(song) => void player.playSong(song)}
+                        onToggleOffline={(song) => void handleToggleOffline(song)}
+                        onTogglePlaylist={handleTogglePlaylist}
+                        onOpenReport={(song) => {
+                          setReportTargetSong(song);
+                          setNoticeOpen(true);
+                        }}
+                      />
+                    ))}
+                  </div>
+                )}
+              </section>
+
+              {/* Offline Saved */}
+              <section className="space-y-2">
+                <div className="bg-[#F5F5F7] rounded-2xl p-3 flex items-center justify-between">
+                  <span className="text-xs font-semibold text-[#1D1D1F]">📥 {t.offlineReady}</span>
+                  <span className="text-xs font-bold text-[#34C759]">{offlineSongs.length} MP3</span>
+                </div>
+
+                {offlineSongs.length === 0 ? (
+                  <p className="text-xs text-[#86868B] text-center py-6">{t.offlineEmpty}</p>
+                ) : (
+                  <div className="divide-y divide-black/[0.06]">
+                    {offlineSongs.map((s) => (
+                      <SongRow
+                        key={s.id}
+                        song={s}
+                        isCurrent={player.currentSong?.id === s.id}
+                        isPlaying={player.isPlaying}
+                        isOffline={true}
+                        isSavingOffline={savingOfflineId === s.id}
+                        isInPlaylist={playlistIds.includes(s.id)}
+                        t={t}
+                        onPlay={(song) => void player.playSong(song)}
+                        onToggleOffline={(song) => void handleToggleOffline(song)}
+                        onTogglePlaylist={handleTogglePlaylist}
+                        onOpenReport={(song) => {
+                          setReportTargetSong(song);
+                          setNoticeOpen(true);
+                        }}
+                      />
+                    ))}
+                  </div>
+                )}
+              </section>
             </div>
           )}
 

@@ -1,4 +1,4 @@
-import { Check, Download, MoreHorizontal, Music2, Pause, Play } from 'lucide-react';
+import { Check, Download, ListCheck, ListPlus, MoreHorizontal, Music2, Pause, Play } from 'lucide-react';
 import type { TranslationStrings } from '../i18n/translations';
 import type { Song } from '../types';
 
@@ -23,9 +23,11 @@ interface SongRowProps {
   isPlaying: boolean;
   isOffline: boolean;
   isSavingOffline: boolean;
+  isInPlaylist?: boolean;
   t: TranslationStrings;
   onPlay: (song: Song) => void;
   onToggleOffline: (song: Song) => void;
+  onTogglePlaylist?: (song: Song) => void;
   onOpenReport: (song: Song) => void;
 }
 
@@ -36,9 +38,11 @@ export function SongRow({
   isPlaying,
   isOffline,
   isSavingOffline,
+  isInPlaylist = false,
   t,
   onPlay,
   onToggleOffline,
+  onTogglePlaylist,
   onOpenReport,
 }: SongRowProps) {
   const authorLabel = song.is_unknown_author ? t.unknownAuthor : song.artist;
@@ -88,6 +92,25 @@ export function SongRow({
       </button>
 
       <div className="flex items-center gap-1.5 shrink-0">
+        {onTogglePlaylist && (
+          <button
+            type="button"
+            onClick={() => onTogglePlaylist(song)}
+            title={isInPlaylist ? t.inPlaylist : t.addToPlaylist}
+            className={`w-8 h-8 rounded-full flex items-center justify-center transition ${
+              isInPlaylist
+                ? 'bg-[#FA243C]/12 text-[#FA243C]'
+                : 'bg-[#F5F5F7] text-[#86868B] active:bg-black/10'
+            }`}
+          >
+            {isInPlaylist ? (
+              <ListCheck className="w-3.5 h-3.5" />
+            ) : (
+              <ListPlus className="w-3.5 h-3.5" />
+            )}
+          </button>
+        )}
+
         <button
           type="button"
           onClick={() => onToggleOffline(song)}

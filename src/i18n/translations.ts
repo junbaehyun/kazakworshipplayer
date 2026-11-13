@@ -73,6 +73,10 @@ export interface TranslationStrings {
   installSub: string;
   installBtn: string;
   installIosHint: string;
+  myPlaylistTitle: string;
+  addToPlaylist: string;
+  inPlaylist: string;
+  playlistEmpty: string;
 }
 
 export const translations: Record<Language, TranslationStrings> = {
@@ -148,7 +152,11 @@ export const translations: Record<Language, TranslationStrings> = {
     installTitle: 'Қолданбаны орнату',
     installSub: 'Офлайн тыңдау және жылдам ашу үшін негізгі экранға қосыңыз.',
     installBtn: 'Орнату',
-    installIosHint: 'Safari-де Бөлісу (↑) → «Басты экранға» басыңыз.'
+    installIosHint: 'Safari-де Бөлісу (↑) → «Басты экранға» басыңыз.',
+    myPlaylistTitle: 'Менің плейлистім',
+    addToPlaylist: 'Плейлистке қосу',
+    inPlaylist: 'Плейлистте',
+    playlistEmpty: 'Кез келген әннің жанындағы + түймесін басып, плейлистке қосыңыз.'
   },
   ko: {
     brand: '카자흐 찬양',
@@ -222,7 +230,11 @@ export const translations: Record<Language, TranslationStrings> = {
     installTitle: '앱으로 설치하기',
     installSub: '오프라인 재생과 빠른 실행을 위해 홈 화면에 추가하세요.',
     installBtn: '설치',
-    installIosHint: 'Safari 하단 공유(↑) → "홈 화면에 추가"를 눌러주세요.'
+    installIosHint: 'Safari 하단 공유(↑) → "홈 화면에 추가"를 눌러주세요.',
+    myPlaylistTitle: '내 플레이리스트',
+    addToPlaylist: '플레이리스트에 추가',
+    inPlaylist: '플레이리스트에 있음',
+    playlistEmpty: '찬양 옆의 + 버튼을 눌러 내 플레이리스트에 담아보세요.'
   },
   en: {
     brand: 'Kazakh Worship',
@@ -296,7 +308,11 @@ export const translations: Record<Language, TranslationStrings> = {
     installTitle: 'Install App',
     installSub: 'Add to your home screen for offline playback & native feel.',
     installBtn: 'Install',
-    installIosHint: 'In Safari, tap Share (↑) → "Add to Home Screen".'
+    installIosHint: 'In Safari, tap Share (↑) → "Add to Home Screen".',
+    myPlaylistTitle: 'My Playlist',
+    addToPlaylist: 'Add to Playlist',
+    inPlaylist: 'In Playlist',
+    playlistEmpty: 'Tap + on any song to add it to your playlist.'
   },
   ru: {
     brand: 'Казахские Песни',
@@ -370,6 +386,10 @@ export const translations: Record<Language, TranslationStrings> = {
     installTitle: 'Установить приложение',
     installSub: 'Добавьте на главный экран для быстрого доступа и офлайн-режима.',
     installBtn: 'Установить',
-    installIosHint: 'В Safari нажмите «Поделиться» (↑) → «На экран «Домой».'
+    installIosHint: 'В Safari нажмите «Поделиться» (↑) → «На экран «Домой».',
+    myPlaylistTitle: 'Мой плейлист',
+    addToPlaylist: 'Добавить в плейлист',
+    inPlaylist: 'В плейлисте',
+    playlistEmpty: 'Нажмите + рядом с любой песней, чтобы добавить её в плейлист.'
   }
 };
