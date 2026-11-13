@@ -209,3 +209,134 @@ SELECT
 WHERE NOT EXISTS (
     SELECT 1 FROM public.kwp_songs WHERE audio_url = 'https://repo.worshipleaderapp.com/mp3/07%20Zhas%20kezimnen%20meni%20sak_tap%20zhurdin_%20Sen%20Track%207%201.mp3'
 );
+
+-- 8. Seed top 10 most played Kazakh worship songs (direct external MP3 URLs)
+INSERT INTO public.kwp_songs (title, artist, is_unknown_author, permission_note, audio_url, storage_path, duration_seconds, lyrics, play_count, uploaded_by, status, is_active)
+SELECT
+    'Жаратқан жерді де, аспанды да (Жетеле мені, жетеле)',
+    'Шынтеміров Әбілхайыр',
+    false,
+    'Top #1 Kazakh worship (#5855 · worshipleaderapp.com)',
+    'https://repo.worshipleaderapp.com/mp3/Shetele%20meni.mp3',
+    NULL,
+    220,
+    E'Жаратқан жерді де, аспанды да.\nШын сүйіп бас ием Құдайыма.\nАдамзат күнәдан арылсын деп\nЖіберді Өз Ұлы Исаны да.\n\nЖетеле мені, жетеле,\nҒажайып жұмақ төріне.\nРухыңды берсең кеудеме,\nМәңгілік құлмын Өзіңе.\nӨзіңе ғана бағынам,\nӨзіңе ғана табынам.\nӨзіңнен артық панам жоқ,\nҚұдайым Саған сиынам.\n\nАдасып көп жылдар шаршадым мен,\nСонда да тыныштық таппадым мен.\nСол сәтте Құдайды ойға алып едім\nБақытқа кенеліп шаттандым мен.\n\nОқыдым Киелі кітабыңды.\nЖүрегім азаптан құтқарылды.\nҰмыттым қайғы мен азабымды,\nӨйткені таныдым Құдайымды.',
+    260, 'developer', 'published', true
+WHERE NOT EXISTS (SELECT 1 FROM public.kwp_songs WHERE audio_url = 'https://repo.worshipleaderapp.com/mp3/Shetele%20meni.mp3');
+
+INSERT INTO public.kwp_songs (title, artist, is_unknown_author, permission_note, audio_url, storage_path, duration_seconds, lyrics, play_count, uploaded_by, status, is_active)
+SELECT
+    'Әр күнде Иса маған қажетсің',
+    'Eddie Espinosa (Қазақша аударма)',
+    false,
+    'Top #3 Kazakh worship (#5873 · worshipleaderapp.com)',
+    'https://repo.worshipleaderapp.com/mp3/Ar%20kunde%20Isa%20magan%20kazhetsin.mp3',
+    NULL,
+    168,
+    E'Әр күнде Иса маған қажетсің,\nКүн сайын Иса маған қажетсің.\nКүнделікті нандай, күнделікті нандай Сен керексің.\nСенің Сөзің маған әр күн қажет.\n\nМен шаршадым, мен мұңайдым,\nМен адастым Сенсіз Иса.',
+    240, 'developer', 'published', true
+WHERE NOT EXISTS (SELECT 1 FROM public.kwp_songs WHERE audio_url = 'https://repo.worshipleaderapp.com/mp3/Ar%20kunde%20Isa%20magan%20kazhetsin.mp3');
+
+INSERT INTO public.kwp_songs (title, artist, is_unknown_author, permission_note, audio_url, storage_path, duration_seconds, lyrics, play_count, uploaded_by, status, is_active)
+SELECT
+    'Жүрегімді өзгертші Тәңір',
+    'Eddie Espinosa',
+    false,
+    'Top #4 Kazakh worship (#5856 · worshipleaderapp.com)',
+    'https://repo.worshipleaderapp.com/mp3/Abukhair%2006.mp3',
+    NULL,
+    203,
+    E'Жүрегімді өзгертші Тәңір,\nАдал ете гөр.\nЖүрегімді өзгертші Тәңір,\nСендей ете гөр.\n\nСен – Шеберсің, балшықпын мен,\nӨзің құйшы, сұраймын мен.',
+    225, 'developer', 'published', true
+WHERE NOT EXISTS (SELECT 1 FROM public.kwp_songs WHERE audio_url = 'https://repo.worshipleaderapp.com/mp3/Abukhair%2006.mp3');
+
+INSERT INTO public.kwp_songs (title, artist, is_unknown_author, permission_note, audio_url, storage_path, duration_seconds, lyrics, play_count, uploaded_by, status, is_active)
+SELECT
+    'Осы әлемде мен жүрдім (Киелі Құдай)',
+    'Белгісіз автор',
+    true,
+    'Top #5 Kazakh worship (#5997 · worshipleaderapp.com)',
+    'https://repo.worshipleaderapp.com/mp3/Osy%20elemde%20men%20zhurdym%20%20osoboe%20mnenie_.mp3',
+    NULL,
+    237,
+    E'Осы әлемде мен жүрдім, мәнін білмей өмірдің.\nӨтірікке сеніппін, жалған сөзге еріппін.\nСонда Сені мен көрдім, жарық нұр боп көріндің,\nКүнәларым кешіріп, бақыт бердің өмірге!\n\nКиелі, Киелі Құдай!\nСен менің жүрегімдесің,\nСен менің көңілімдесің,\nСен менің өмірімдесің Иса!\n\nҚуанамын мен бүгін, бақыттымын мәңгілік!\nЖүрегімде ән салып, шырқаймын мен ән салып.\nМадақтаймын мен Сені, сүйем Сені Тәңірім!\nӘрбір басқан қадамым Сенің қолыңда бүгін!',
+    210, 'developer', 'published', true
+WHERE NOT EXISTS (SELECT 1 FROM public.kwp_songs WHERE audio_url = 'https://repo.worshipleaderapp.com/mp3/Osy%20elemde%20men%20zhurdym%20%20osoboe%20mnenie_.mp3');
+
+INSERT INTO public.kwp_songs (title, artist, is_unknown_author, permission_note, audio_url, storage_path, duration_seconds, lyrics, play_count, uploaded_by, status, is_active)
+SELECT
+    'Жолымдағы жарық жұлдыздай',
+    'Белгісіз автор',
+    true,
+    'Top #6 Kazakh worship (#5859 · worshipleaderapp.com)',
+    'https://repo.worshipleaderapp.com/mp3/Zholimdagi%20sharyk%20shuldysdai%201.mp3',
+    NULL,
+    292,
+    E'Жолымдағы жарық жұлдыздай\nЖүрегімнің нұры Өзіңсің.\nҚараңғыда адасып қалмай\nӨзіңе мен еріп келемін.\n\nЖетелеші мені Тәңірім,\nНұрыңа Сен бөлей гөр мені.\nӨзің болдың өмір тірегім,\nМәңгілікке сүйемін Сені.\n\nКөңілімнің шаттығы Сенсің,\nЖанымның Сен жұбанышысың.\nӨмірімнің мәні бір Өзің,\nЖаратушым, Құтқарушымсың.',
+    195, 'developer', 'published', true
+WHERE NOT EXISTS (SELECT 1 FROM public.kwp_songs WHERE audio_url = 'https://repo.worshipleaderapp.com/mp3/Zholimdagi%20sharyk%20shuldysdai%201.mp3');
+
+INSERT INTO public.kwp_songs (title, artist, is_unknown_author, permission_note, audio_url, storage_path, duration_seconds, lyrics, play_count, uploaded_by, status, is_active)
+SELECT
+    'Мені қолдайсың Құдайым',
+    'Белгісіз автор',
+    true,
+    'Top #7 Kazakh worship (#5989 · worshipleaderapp.com)',
+    'https://repo.worshipleaderapp.com/mp3/Meni%20koldaisin.mp3',
+    NULL,
+    263,
+    E'Мені қолдайсың Құдайым әр күнде,\nСенің қалауың менің өмірімде.\nБасыма қандай сынақ түссе дағы,\nСенің рақымың менімен мәңгіге.\n\nСен менің панамсың, таусылмас күшімсің,\nЖүрегімді билеген жалғыз Үмітімсің.\nМадақтаймын Сені, бар дауыспен ән салам,\nТәңірім Иса, мен Саған бағынам!',
+    185, 'developer', 'published', true
+WHERE NOT EXISTS (SELECT 1 FROM public.kwp_songs WHERE audio_url = 'https://repo.worshipleaderapp.com/mp3/Meni%20koldaisin.mp3');
+
+INSERT INTO public.kwp_songs (title, artist, is_unknown_author, permission_note, audio_url, storage_path, duration_seconds, lyrics, play_count, uploaded_by, status, is_active)
+SELECT
+    'Таң атқанда',
+    'Ыдырыс',
+    false,
+    'Top #8 Kazakh worship (#6040 · worshipleaderapp.com)',
+    'https://repo.worshipleaderapp.com/mp3/09%20Tan_%20atk_anda.mp3',
+    NULL,
+    311,
+    E'Таң атқанда оянып, Сені шақырам,\nҚуанып мен ән салам. Сені жырлаймын.\n\nАңсайсың Сен менің жырымды,\nСаған арналған өмірімді.\nКүні бойы Сені мақтаймын,\nМахаббатыңды жариялаймын.\nО, Иса! (О, Иса) О, Иса! Иса! О, Иса,\nДәл қазір келші маған,\nСағындым мен.\n\nСені сүйем, мен бас ием, Тәңірім-ай!',
+    175, 'developer', 'published', true
+WHERE NOT EXISTS (SELECT 1 FROM public.kwp_songs WHERE audio_url = 'https://repo.worshipleaderapp.com/mp3/09%20Tan_%20atk_anda.mp3');
+
+INSERT INTO public.kwp_songs (title, artist, is_unknown_author, permission_note, audio_url, storage_path, duration_seconds, lyrics, play_count, uploaded_by, status, is_active)
+SELECT
+    'Тәңірді мадақта (Он мың себеп)',
+    'Jonas Myrin, Matt Redman (Ауд. Нұржан Төлеген)',
+    false,
+    'Top #9 Kazakh worship (#9685 · worshipleaderapp.com)',
+    'https://repo.worshipleaderapp.com/mp3/10%20On%20myn_%20sebep..Track%2010.mp3',
+    NULL,
+    279,
+    E'Тәңірді мадақта жан-дүнием!\nКиелі есімін!\nБар дауыспен мадақта жан-дүнием!\nТәңірді мадақта!\n\nТамаша арайлы таң атты,\nТәңірім ғажап күн жаратты.\nОсынау керемет рақымы үшін,\nАрнайық біз мадақты.\n\nРақымың мен махаббатың шексіз,\nТәңірім Сен ұлысың.\nОн мың себеп те аз болар маған\nМәңгі айтар жырымсың!\n\nҚуатым кеміп сарқылған күні,\nАжалым жетіп ақырғы.\nЖан-дүнием Сені жырлайды тағы,\nМәңгілікке Атыңды!\n\nТәңірді мадақта жан-дүнием!\nКиелі есімін!\nБар дауыспен мадақта жан-дүнием!\nТәңірді мадақта!\nТәңірді мадақта!\nТәңірді мадақта!',
+    165, 'developer', 'published', true
+WHERE NOT EXISTS (SELECT 1 FROM public.kwp_songs WHERE audio_url = 'https://repo.worshipleaderapp.com/mp3/10%20On%20myn_%20sebep..Track%2010.mp3');
+
+INSERT INTO public.kwp_songs (title, artist, is_unknown_author, permission_note, audio_url, storage_path, duration_seconds, lyrics, play_count, uploaded_by, status, is_active)
+SELECT
+    'Келемін Саған Жаратушым',
+    'Эва-Лена Хеллмарк',
+    false,
+    'Top #10 Kazakh worship (#5888 · worshipleaderapp.com)',
+    'https://repo.worshipleaderapp.com/mp3/kaelaem_n%20s_n.mp3',
+    NULL,
+    244,
+    E'Келемін Саған Жаратушым\nСенің шексіз махаббатың,\nТаусылмайды рақымың.\n\nҰлысың Сен,\nСен ғажайып ұлысың.\nСенен артық ешкім жоқ,\nСаған ешкім тең келмес.\n\nКелемін Саған, аңсап Сені.\nЖүрегімді жадыратшы,\nМәңгілікке жасашы.',
+    158, 'developer', 'published', true
+WHERE NOT EXISTS (SELECT 1 FROM public.kwp_songs WHERE audio_url = 'https://repo.worshipleaderapp.com/mp3/kaelaem_n%20s_n.mp3');
+
+INSERT INTO public.kwp_songs (title, artist, is_unknown_author, permission_note, audio_url, storage_path, duration_seconds, lyrics, play_count, uploaded_by, status, is_active)
+SELECT
+    'Патшалық, салтанат',
+    'Chris Tomlin, Jesse Reeves, Ed Cash (Ауд. Нұржан Төлеген)',
+    false,
+    'Top #11 Kazakh worship (#9679 · worshipleaderapp.com)',
+    'https://repo.worshipleaderapp.com/mp3/04%20Patshalyk_%20saltanat%20Track%204.mp3',
+    NULL,
+    232,
+    E'Патшалық салтанат\nҰлылық жарқырап\nБәрі ән салсын\nҒаламға жар салсын!\nӨзін нұрға бөлеп\nЖасырынды түнек\nЕстіп үнін Оның,\nЕстіп үнін Оның\n\nИеміз - ұлы!\nӘнге сал бірге, Ол - ұлы!\nБарлығы көрсін,\nБілсін Ол - ұлы!\n\nҒасырдан ғасырға\nБарлығы қолында\nБасы Ол соңы да, басы Ол соңы да\nҮшбірліктегі Ол\nӘке Рух және Ұл\n«Арыстан» да Өзі\nКелген болып «Қозы»\n\nЕсімі ең жоғары\nБар мадаққа лайықты,\nЖан дүнием жырласын,\nОл - ұлы!',
+    152, 'developer', 'published', true
+WHERE NOT EXISTS (SELECT 1 FROM public.kwp_songs WHERE audio_url = 'https://repo.worshipleaderapp.com/mp3/04%20Patshalyk_%20saltanat%20Track%204.mp3');
