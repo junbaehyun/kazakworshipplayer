@@ -271,7 +271,15 @@ export async function fetchAndCacheAudioBlob(song: Song): Promise<Blob> {
     return blob;
   }
 
-  const res = await fetch(song.audio_url);
+  let res: Response;
+  try {
+    res = await fetch(song.audio_url);
+  } catch {
+    res = await fetch(`/api/proxy-audio?url=${encodeURIComponent(song.audio_url)}`);
+  }
+  if (!res.ok) {
+    throw new Error(`Failed to download audio (${res.status})`);
+  }
   const blob = await res.blob();
   await saveOfflineBlob(song.id, blob);
   return blob;
