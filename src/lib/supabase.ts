@@ -297,7 +297,14 @@ export async function resolveAudioSource(song: Song): Promise<{ src: string; isO
   return { src: song.audio_url, isObjectUrl: false };
 }
 
-// --- Admin Auth & Management ---
+// --- Auth & Admin Management ---
+export const ADMIN_EMAILS = ['junbaehyun.kz@gmail.com', 'wnsqo35@gmail.com'];
+
+export function isAdminSession(session: Session | null): boolean {
+  const email = session?.user?.email?.toLowerCase();
+  return Boolean(email && ADMIN_EMAILS.includes(email));
+}
+
 export async function getAdminSession(): Promise<Session | null> {
   if (!supabase) return null;
   const { data } = await supabase.auth.getSession();
@@ -308,6 +315,22 @@ export async function signInAdmin(email: string, password: string): Promise<{ se
   if (!supabase) return { session: null, error: 'Supabase not configured' };
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
   return { session: data.session, error: error?.message ?? null };
+}
+
+export async function signUpUser(
+  email: string,
+  password: string
+): Promise<{ session: Session | null; needsEmailConfirmation: boolean; error: string | null }> {
+  if (!supabase) return { session: null, needsEmailConfirmation: false, error: 'Supabase not configured' };
+  const { data, error } = await supabase.auth.signUp({ email, password });
+  if (error) {
+    return { session: null, needsEmailConfirmation: false, error: error.message };
+  }
+  return {
+    session: data.session,
+    needsEmailConfirmation: Boolean(data.user && !data.session),
+    error: null,
+  };
 }
 
 export async function signOutAdmin(): Promise<void> {

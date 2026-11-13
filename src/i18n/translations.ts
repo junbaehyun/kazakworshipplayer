@@ -78,6 +78,17 @@ export interface TranslationStrings {
   addToPlaylist: string;
   inPlaylist: string;
   playlistEmpty: string;
+  authGateTitle: string;
+  authGateSubtitle: string;
+  authSignInTab: string;
+  authSignUpTab: string;
+  authEmailPlaceholder: string;
+  authPasswordPlaceholder: string;
+  authSignInBtn: string;
+  authSignUpBtn: string;
+  authCheckEmailMsg: string;
+  authAccountTitle: string;
+  authSignOutBtn: string;
 }
 
 export const translations: Record<Language, TranslationStrings> = {
@@ -158,7 +169,18 @@ export const translations: Record<Language, TranslationStrings> = {
     myPlaylistTitle: 'Менің плейлистім',
     addToPlaylist: 'Плейлистке қосу',
     inPlaylist: 'Плейлистте',
-    playlistEmpty: 'Кез келген әннің жанындағы + түймесін басып, плейлистке қосыңыз.'
+    playlistEmpty: 'Кез келген әннің жанындағы + түймесін басып, плейлистке қосыңыз.',
+    authGateTitle: 'Тыңдауды жалғастыру үшін кіріңіз',
+    authGateSubtitle: 'Сіз 1 әнді тегін тыңдадыңыз. Барлық мадақ әндерін шектеусіз тыңдау үшін кіріңіз немесе тіркеліңіз.',
+    authSignInTab: 'Кіру',
+    authSignUpTab: 'Тіркелу',
+    authEmailPlaceholder: 'Электрондық пошта',
+    authPasswordPlaceholder: 'Құпиясөз (кемінде 6 таңба)',
+    authSignInBtn: 'Кіру',
+    authSignUpBtn: 'Тіркелгі жасау',
+    authCheckEmailMsg: 'Растау хаты поштаңызға жіберілді. Поштаңызды растап, кіріңіз.',
+    authAccountTitle: 'Тіркелгі',
+    authSignOutBtn: 'Шығу'
   },
   ko: {
     brand: '카자흐 찬양',
@@ -237,7 +259,18 @@ export const translations: Record<Language, TranslationStrings> = {
     myPlaylistTitle: '내 플레이리스트',
     addToPlaylist: '플레이리스트에 추가',
     inPlaylist: '플레이리스트에 있음',
-    playlistEmpty: '찬양 옆의 + 버튼을 눌러 내 플레이리스트에 담아보세요.'
+    playlistEmpty: '찬양 옆의 + 버튼을 눌러 내 플레이리스트에 담아보세요.',
+    authGateTitle: '계속 들으려면 로그인하세요',
+    authGateSubtitle: '1곡 무료 감상을 완료했습니다. 모든 카자흐 찬양을 무제한으로 들으려면 로그인하거나 가입하세요.',
+    authSignInTab: '로그인',
+    authSignUpTab: '회원가입',
+    authEmailPlaceholder: '이메일',
+    authPasswordPlaceholder: '비밀번호 (6자 이상)',
+    authSignInBtn: '로그인',
+    authSignUpBtn: '회원가입',
+    authCheckEmailMsg: '인증 메일을 보냈습니다. 이메일 인증 후 로그인해주세요.',
+    authAccountTitle: '계정',
+    authSignOutBtn: '로그아웃'
   },
   en: {
     brand: 'Kazakh Worship',
@@ -316,7 +349,18 @@ export const translations: Record<Language, TranslationStrings> = {
     myPlaylistTitle: 'My Playlist',
     addToPlaylist: 'Add to Playlist',
     inPlaylist: 'In Playlist',
-    playlistEmpty: 'Tap + on any song to add it to your playlist.'
+    playlistEmpty: 'Tap + on any song to add it to your playlist.',
+    authGateTitle: 'Sign in to keep listening',
+    authGateSubtitle: 'You have listened to your 1 free song. Sign in or create a free account to continue listening.',
+    authSignInTab: 'Sign In',
+    authSignUpTab: 'Sign Up',
+    authEmailPlaceholder: 'Email address',
+    authPasswordPlaceholder: 'Password (6+ characters)',
+    authSignInBtn: 'Sign In',
+    authSignUpBtn: 'Create Account',
+    authCheckEmailMsg: 'Confirmation email sent. Please check your inbox and then sign in.',
+    authAccountTitle: 'Account',
+    authSignOutBtn: 'Sign Out'
   },
   ru: {
     brand: 'Казахские Песни',
@@ -395,6 +439,17 @@ export const translations: Record<Language, TranslationStrings> = {
     myPlaylistTitle: 'Мой плейлист',
     addToPlaylist: 'Добавить в плейлист',
     inPlaylist: 'В плейлисте',
-    playlistEmpty: 'Нажмите + рядом с любой песней, чтобы добавить её в плейлист.'
+    playlistEmpty: 'Нажмите + рядом с любой песней, чтобы добавить её в плейлист.',
+    authGateTitle: 'Войдите, чтобы слушать дальше',
+    authGateSubtitle: 'Вы прослушали 1 бесплатную песню. Войдите или создайте бесплатный аккаунт, чтобы слушать без ограничений.',
+    authSignInTab: 'Вход',
+    authSignUpTab: 'Регистрация',
+    authEmailPlaceholder: 'Электронная почта',
+    authPasswordPlaceholder: 'Пароль (минимум 6 символов)',
+    authSignInBtn: 'Войти',
+    authSignUpBtn: 'Создать аккаунт',
+    authCheckEmailMsg: 'Письмо с подтверждением отправлено на вашу почту. Подтвердите email и войдите.',
+    authAccountTitle: 'Аккаунт',
+    authSignOutBtn: 'Выйти'
   }
 };

@@ -8,6 +8,7 @@ import {
   Settings,
   X,
 } from 'lucide-react';
+import { AuthModal } from './components/AuthModal';
 import { BakhytKaynarView } from './components/BakhytKaynarView';
 import { FullPlayerSheet } from './components/FullPlayerSheet';
 import { InstallPromptBanner } from './components/InstallPromptBanner';
@@ -25,7 +26,7 @@ import {
   removeOfflineBlob,
   resetWeeklyChartPlays,
 } from './lib/localDb';
-import { fetchAndCacheAudioBlob, fetchSongs, getAdminSession, supabase } from './lib/supabase';
+import { fetchAndCacheAudioBlob, fetchSongs, getAdminSession, isAdminSession, supabase } from './lib/supabase';
 import type { Language, Song, TabId } from './types';
 
 const LANGS: Language[] = ['kk', 'ko', 'en', 'ru'];
@@ -67,10 +68,23 @@ export function App() {
   const [noticeOpen, setNoticeOpen] = useState(false);
   const [reportTargetSong, setReportTargetSong] = useState<Song | null>(null);
   const [session, setSession] = useState<Session | null>(null);
+  const [localUserEmail, setLocalUserEmail] = useState<string | null>(() => {
+    return localStorage.getItem('kwp_local_user_email');
+  });
+  const [guestSongDone, setGuestSongDone] = useState<boolean>(() => {
+    return localStorage.getItem('kwp_guest_song_done') === 'true';
+  });
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const pendingSongRef = useRef<Song | null>(null);
   const [showKaynarTab, setShowKaynarTab] = useState<boolean>(() => {
     return localStorage.getItem(DEV_KAYNAR_KEY) !== 'false';
   });
   const hasAutoLoadedRef = useRef(false);
+
+  const isAdmin = useMemo(() => isAdminSession(session), [session]);
+  const isAuthenticated = Boolean(session || localUserEmail);
+  const isAuthenticatedRef = useRef(isAuthenticated);
+  isAuthenticatedRef.current = isAuthenticated;
 
   const t = translations[lang];
 
@@ -94,9 +108,9 @@ export function App() {
   }, []);
 
   const refreshSongs = useCallback(async () => {
-    const { songs: loaded } = await fetchSongs(Boolean(session));
+    const { songs: loaded } = await fetchSongs(isAdmin);
     setSongs(loaded);
-  }, [session]);
+  }, [isAdmin]);
 
   useEffect(() => {
     void getAdminSession().then(setSession);
@@ -159,9 +173,33 @@ export function App() {
 
   const libraryQueue = useMemo(() => publishedSongs, [publishedSongs]);
 
+  const handleBeforePlay = useCallback(
+    (song: Song) => {
+      if (!isAuthenticatedRef.current && guestSongDone) {
+        pendingSongRef.current = song;
+        setIsAuthModalOpen(true);
+        return false;
+      }
+      return true;
+    },
+    [guestSongDone]
+  );
+
+  const handleSongEnded = useCallback(() => {
+    if (!isAuthenticatedRef.current) {
+      setGuestSongDone(true);
+      localStorage.setItem('kwp_guest_song_done', 'true');
+      setIsAuthModalOpen(true);
+      return true;
+    }
+    return false;
+  }, []);
+
   const player = useAudioPlayer({
     songs: libraryQueue,
     onPlayCountUpdated: handlePlayCountUpdated,
+    onBeforePlay: handleBeforePlay,
+    onSongEnded: handleSongEnded,
   });
 
   useEffect(() => {
@@ -551,7 +589,7 @@ export function App() {
               </button>
               <UploadView
                 t={t}
-                isAdmin={Boolean(session)}
+                isAdmin={isAdmin}
                 onUploaded={(newSong) => {
                   setSongs((prev) => [newSong, ...prev]);
                   void refreshOfflineStats();
@@ -675,6 +713,8 @@ export function App() {
                   <SettingsAdminView
                     t={t}
                     session={session}
+                    isAdmin={isAdmin}
+                    localUserEmail={localUserEmail}
                     offlineCount={offlineIds.length}
                     offlineBytes={offlineBytes}
                     songs={songs}
@@ -682,6 +722,10 @@ export function App() {
                     onToggleKaynarTab={handleToggleKaynarTab}
                     onClearOffline={handleClearOffline}
                     onSessionChange={setSession}
+                    onLocalSignOut={() => {
+                      localStorage.removeItem('kwp_local_user_email');
+                      setLocalUserEmail(null);
+                    }}
                     onRefreshSongs={refreshSongs}
                     onOpenNotice={() => {
                       setReportTargetSong(null);
@@ -705,6 +749,30 @@ export function App() {
           targetSong={reportTargetSong}
           t={t}
           onClose={() => setNoticeOpen(false)}
+        />
+
+        {/* Login Gate Modal (shown after listening 1 song) */}
+        <AuthModal
+          isOpen={isAuthModalOpen}
+          t={t}
+          onClose={() => setIsAuthModalOpen(false)}
+          onAuthenticated={(nextSession, localEmail) => {
+            isAuthenticatedRef.current = true;
+            if (nextSession) {
+              setSession(nextSession);
+            } else if (localEmail) {
+              localStorage.setItem('kwp_local_user_email', localEmail);
+              setLocalUserEmail(localEmail);
+            }
+            setIsAuthModalOpen(false);
+            const queued = pendingSongRef.current;
+            pendingSongRef.current = null;
+            if (queued) {
+              void player.playSong(queued);
+            } else {
+              player.playNext(false);
+            }
+          }}
         />
       </div>
     </div>

@@ -16,6 +16,8 @@ import type { Song, SongReport } from '../types';
 interface SettingsAdminViewProps {
   t: TranslationStrings;
   session: Session | null;
+  isAdmin: boolean;
+  localUserEmail: string | null;
   offlineCount: number;
   offlineBytes: number;
   songs: Song[];
@@ -23,6 +25,7 @@ interface SettingsAdminViewProps {
   onToggleKaynarTab: (next: boolean) => void;
   onClearOffline: () => Promise<void>;
   onSessionChange: (session: Session | null) => void;
+  onLocalSignOut: () => void;
   onRefreshSongs: () => Promise<void>;
   onOpenNotice: () => void;
   onNavigateTab: (tab: 'chart' | 'offline' | 'upload') => void;
@@ -32,6 +35,8 @@ interface SettingsAdminViewProps {
 export function SettingsAdminView({
   t,
   session,
+  isAdmin,
+  localUserEmail,
   offlineCount,
   offlineBytes,
   songs,
@@ -39,6 +44,7 @@ export function SettingsAdminView({
   onToggleKaynarTab,
   onClearOffline,
   onSessionChange,
+  onLocalSignOut,
   onRefreshSongs,
   onOpenNotice,
   onNavigateTab,
@@ -70,10 +76,10 @@ export function SettingsAdminView({
   };
 
   useEffect(() => {
-    if (session) {
+    if (isAdmin) {
       void adminFetchReports().then(setReports);
     }
-  }, [session]);
+  }, [isAdmin]);
 
   const handleLogin = async (e: FormEvent) => {
     e.preventDefault();
@@ -92,6 +98,7 @@ export function SettingsAdminView({
   const handleLogout = async () => {
     await signOutAdmin();
     onSessionChange(null);
+    onLocalSignOut();
     setReports([]);
   };
 
@@ -303,9 +310,9 @@ export function SettingsAdminView({
           <div className="flex items-center justify-between">
             <h3 className="text-xs font-extrabold text-[#1D1D1F] flex items-center gap-1.5">
               <ShieldCheck className="w-4 h-4 text-[#FA243C]" />
-              <span>{t.adminSectionTitle}</span>
+              <span>{isAdmin ? t.adminSectionTitle : session || localUserEmail ? t.authAccountTitle : t.adminSectionTitle}</span>
             </h3>
-            {session && (
+            {(session || localUserEmail) && (
               <button
                 type="button"
                 onClick={() => void handleLogout()}
@@ -313,11 +320,11 @@ export function SettingsAdminView({
               >
                 <LogOut className="w-3.5 h-3.5" />
                 <span>{t.adminLogoutBtn}</span>
-            </button>
-          )}
-        </div>
+              </button>
+            )}
+          </div>
 
-        {!session ? (
+        {!session && !localUserEmail ? (
           <form onSubmit={handleLogin} className="space-y-2.5">
             <input
               type="email"
@@ -344,10 +351,14 @@ export function SettingsAdminView({
               {isLoggingIn ? '...' : t.adminLoginBtn}
             </button>
           </form>
+        ) : !isAdmin ? (
+          <p className="text-xs text-[#34C759] font-semibold">
+            ✓ {t.adminLoggedInAs} {session?.user.email ?? localUserEmail}
+          </p>
         ) : (
           <div className="space-y-4">
             <p className="text-xs text-[#34C759] font-semibold">
-              ✓ {t.adminLoggedInAs} {session.user.email}
+              ✓ {t.adminLoggedInAs} {session?.user.email}
             </p>
 
             {/* Pending Songs (if any) */}

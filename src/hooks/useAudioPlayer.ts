@@ -5,6 +5,8 @@ import { incrementSongPlay, resolveAudioSource } from '../lib/supabase';
 interface UseAudioPlayerOptions {
   songs: Song[];
   onPlayCountUpdated: (songId: string, newCount: number) => void;
+  onBeforePlay?: (song: Song) => boolean;
+  onSongEnded?: (song: Song) => boolean | void;
 }
 
 function buildShuffledIds(songs: Song[], excludeId?: string): string[] {
@@ -18,7 +20,12 @@ function buildShuffledIds(songs: Song[], excludeId?: string): string[] {
   return pool;
 }
 
-export function useAudioPlayer({ songs, onPlayCountUpdated }: UseAudioPlayerOptions) {
+export function useAudioPlayer({
+  songs,
+  onPlayCountUpdated,
+  onBeforePlay,
+  onSongEnded,
+}: UseAudioPlayerOptions) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const objectUrlRef = useRef<string | null>(null);
   const playTrackedForIdRef = useRef<string | null>(null);
@@ -71,6 +78,7 @@ export function useAudioPlayer({ songs, onPlayCountUpdated }: UseAudioPlayerOpti
 
       if (currentSong?.id === song.id && audio.src) {
         if (audio.paused) {
+          if (onBeforePlay && !onBeforePlay(song)) return;
           await audio.play().catch(() => {});
           setIsPlaying(true);
         } else {
@@ -79,6 +87,8 @@ export function useAudioPlayer({ songs, onPlayCountUpdated }: UseAudioPlayerOpti
         }
         return;
       }
+
+      if (onBeforePlay && !onBeforePlay(song)) return;
 
       if (objectUrlRef.current) {
         URL.revokeObjectURL(objectUrlRef.current);
@@ -122,7 +132,7 @@ export function useAudioPlayer({ songs, onPlayCountUpdated }: UseAudioPlayerOpti
         });
       }
     },
-    [currentSong]
+    [currentSong, onBeforePlay]
   );
 
   const togglePlay = useCallback(async () => {
@@ -133,13 +143,14 @@ export function useAudioPlayer({ songs, onPlayCountUpdated }: UseAudioPlayerOpti
       return;
     }
     if (audio.paused) {
+      if (currentSong && onBeforePlay && !onBeforePlay(currentSong)) return;
       await audio.play().catch(() => {});
       setIsPlaying(true);
     } else {
       audio.pause();
       setIsPlaying(false);
     }
-  }, [currentSong, playSong, songs]);
+  }, [currentSong, onBeforePlay, playSong, songs]);
 
   const playNext = useCallback(
     (autoAdvance = false) => {
@@ -260,7 +271,13 @@ export function useAudioPlayer({ songs, onPlayCountUpdated }: UseAudioPlayerOpti
     };
 
     const onLoadedMetadata = () => setDuration(audio.duration || 0);
-    const onEnded = () => playNext(true);
+    const onEnded = () => {
+      if (currentSong && onSongEnded?.(currentSong) === true) {
+        setIsPlaying(false);
+        return;
+      }
+      playNext(true);
+    };
     const onPlay = () => setIsPlaying(true);
     const onPause = () => setIsPlaying(false);
 
@@ -277,7 +294,7 @@ export function useAudioPlayer({ songs, onPlayCountUpdated }: UseAudioPlayerOpti
       audio.removeEventListener('play', onPlay);
       audio.removeEventListener('pause', onPause);
     };
-  }, [currentSong, playNext, triggerPlayIncrement]);
+  }, [currentSong, onSongEnded, playNext, triggerPlayIncrement]);
 
   // Wire MediaSession Lock-Screen Controls
   useEffect(() => {
