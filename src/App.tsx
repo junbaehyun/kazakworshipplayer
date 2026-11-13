@@ -21,12 +21,10 @@ import { useAudioPlayer } from './hooks/useAudioPlayer';
 import { translations } from './i18n/translations';
 import {
   clearAllOfflineBlobs,
-  createDemoToneWavBlob,
   listOfflineIds,
   removeOfflineBlob,
-  saveOfflineBlob,
 } from './lib/localDb';
-import { fetchSongs, getAdminSession, supabase } from './lib/supabase';
+import { fetchAndCacheAudioBlob, fetchSongs, getAdminSession, supabase } from './lib/supabase';
 import type { Language, Song, TabId } from './types';
 
 const LANGS: Language[] = ['kk', 'ko', 'en', 'ru'];
@@ -100,14 +98,7 @@ export function App() {
 
     setSavingOfflineId(song.id);
     try {
-      let blob: Blob;
-      if (song.id.startsWith('demo-') || !song.audio_url) {
-        blob = createDemoToneWavBlob(song.id === 'demo-1' ? 261.63 : 329.63, 6);
-      } else {
-        const res = await fetch(song.audio_url);
-        blob = await res.blob();
-      }
-      await saveOfflineBlob(song.id, blob);
+      await fetchAndCacheAudioBlob(song);
       await refreshOfflineStats();
     } catch (err) {
       console.error('Failed to save offline:', err);

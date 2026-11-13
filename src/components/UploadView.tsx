@@ -35,6 +35,28 @@ export function UploadView({ t, isAdmin, onUploaded }: UploadViewProps) {
   const [consent, setConsent] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const MAX_FILE_BYTES = 20 * 1024 * 1024; // 20 MB cap for GAS + Google Drive free tier
+
+  const handleFileChange = (selected: File | null) => {
+    setErrorMsg(null);
+    if (!selected) {
+      setFile(null);
+      return;
+    }
+    if (!selected.type.startsWith('audio/') && !/\.(mp3|m4a|wav|ogg|aac)$/i.test(selected.name)) {
+      setErrorMsg('Only audio files (.mp3, .m4a, .wav, .ogg) are allowed.');
+      setFile(null);
+      return;
+    }
+    if (selected.size > MAX_FILE_BYTES) {
+      setErrorMsg('File is too large (max 20 MB per song to keep storage free).');
+      setFile(null);
+      return;
+    }
+    setFile(selected);
+  };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -42,6 +64,7 @@ export function UploadView({ t, isAdmin, onUploaded }: UploadViewProps) {
 
     setIsSubmitting(true);
     setFeedback(null);
+    setErrorMsg(null);
     try {
       const durationSeconds = await getAudioDuration(file);
       const { song } = await uploadSong({
@@ -123,10 +146,11 @@ export function UploadView({ t, isAdmin, onUploaded }: UploadViewProps) {
             type="file"
             accept="audio/*,.mp3,.m4a,.wav,.ogg"
             required
-            onChange={(e) => setFile(e.target.files?.[0] || null)}
+            onChange={(e) => handleFileChange(e.target.files?.[0] || null)}
             className="hidden"
           />
         </label>
+        <p className="text-[11px] text-[#86868B]">Max 20 MB · Cached locally after first play</p>
       </div>
 
       <div className="space-y-1">
@@ -150,6 +174,12 @@ export function UploadView({ t, isAdmin, onUploaded }: UploadViewProps) {
         />
         <span>{t.uploadConsent}</span>
       </label>
+
+      {errorMsg && (
+        <div className="bg-[#FA243C]/10 text-[#FA243C] text-xs font-semibold rounded-xl px-3 py-2">
+          {errorMsg}
+        </div>
+      )}
 
       {feedback && (
         <div className="bg-[#34C759]/15 text-[#1D1D1F] text-xs font-semibold rounded-xl px-3 py-2">

@@ -14,8 +14,32 @@ const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
 const STORAGE_BUCKET = (import.meta.env.VITE_SUPABASE_STORAGE_BUCKET as string) || 'kazakh-worship';
 const STORAGE_FOLDER = (import.meta.env.VITE_SUPABASE_STORAGE_FOLDER as string) || 'kwp-audio';
+const GAS_WEBAPP_URL = (import.meta.env.VITE_GAS_WEBAPP_URL as string | undefined)?.trim() || '';
 
 export const isSupabaseConfigured = Boolean(SUPABASE_URL && SUPABASE_KEY);
+export const isGasStorageConfigured = Boolean(GAS_WEBAPP_URL);
+
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result || '');
+      const idx = result.indexOf(',');
+      resolve(idx >= 0 ? result.slice(idx + 1) : result);
+    };
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+
+function base64ToBlob(base64Data: string, mimeType: string): Blob {
+  const binary = atob(base64Data);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return new Blob([bytes], { type: mimeType });
+}
 
 export const supabase = isSupabaseConfigured
   ? createClient(SUPABASE_URL!, SUPABASE_KEY!)
@@ -67,16 +91,41 @@ export async function uploadSong(params: {
 
   if (supabase) {
     try {
-      const safeName = params.file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-      const storagePath = `${STORAGE_FOLDER}/${Date.now()}-${safeName}`;
+      let audioUrl = '';
+      let storagePath: string | null = null;
 
-      const { error: uploadErr } = await supabase.storage
-        .from(STORAGE_BUCKET)
-        .upload(storagePath, params.file, { cacheControl: '3600', upsert: false });
+      if (GAS_WEBAPP_URL) {
+        // Upload to Google Drive via GAS Web App (15 GB free, $0)
+        const base64Data = await fileToBase64(params.file);
+        const gasRes = await fetch(GAS_WEBAPP_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({
+            fileName: params.file.name,
+            mimeType: params.file.type || 'audio/mpeg',
+            base64Data,
+          }),
+        });
+        const gasJson = (await gasRes.json()) as { ok: boolean; fileId?: string; error?: string };
+        if (!gasJson.ok || !gasJson.fileId) {
+          throw new Error(gasJson.error || 'Google Drive upload failed');
+        }
+        audioUrl = `gdrive://${gasJson.fileId}`;
+        storagePath = gasJson.fileId;
+      } else {
+        // Fallback to Supabase Storage
+        const safeName = params.file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+        storagePath = `${STORAGE_FOLDER}/${Date.now()}-${safeName}`;
 
-      if (uploadErr) throw uploadErr;
+        const { error: uploadErr } = await supabase.storage
+          .from(STORAGE_BUCKET)
+          .upload(storagePath, params.file, { cacheControl: '3600', upsert: false });
 
-      const { data: urlData } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(storagePath);
+        if (uploadErr) throw uploadErr;
+
+        const { data: urlData } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(storagePath);
+        audioUrl = urlData.publicUrl;
+      }
 
       const { data: inserted, error: insertErr } = await supabase
         .from('kwp_songs')
@@ -84,7 +133,7 @@ export async function uploadSong(params: {
           title: params.title.trim(),
           artist: cleanArtist,
           is_unknown_author: params.isUnknownAuthor || !params.artist.trim(),
-          audio_url: urlData.publicUrl,
+          audio_url: audioUrl,
           storage_path: storagePath,
           duration_seconds: Math.round(params.durationSeconds || 0),
           lyrics: params.lyrics.trim() || null,
@@ -96,9 +145,11 @@ export async function uploadSong(params: {
         .single();
 
       if (insertErr) throw insertErr;
-      return { song: inserted as Song, savedLocally: false };
+      const insertedSong = inserted as Song;
+      await saveOfflineBlob(insertedSong.id, params.file);
+      return { song: insertedSong, savedLocally: false };
     } catch (err) {
-      console.warn('Supabase upload failed, saving to local IndexedDB:', err);
+      console.warn('Cloud upload failed, saving to local IndexedDB:', err);
     }
   }
 
@@ -177,16 +228,51 @@ export async function submitReport(params: {
   saveLocalReports([newReport, ...existing]);
 }
 
+export async function fetchAndCacheAudioBlob(song: Song): Promise<Blob> {
+  const existing = await getOfflineBlob(song.id);
+  if (existing) return existing;
+
+  if (song.id.startsWith('demo-') || !song.audio_url) {
+    const freq = song.id === 'demo-1' ? 261.63 : 329.63;
+    const demoBlob = createDemoToneWavBlob(freq, 6);
+    await saveOfflineBlob(song.id, demoBlob);
+    return demoBlob;
+  }
+
+  if (song.audio_url.startsWith('gdrive://')) {
+    if (!GAS_WEBAPP_URL) {
+      throw new Error('VITE_GAS_WEBAPP_URL is not configured');
+    }
+    const fileId = song.audio_url.replace('gdrive://', '');
+    const res = await fetch(`${GAS_WEBAPP_URL}?fileId=${encodeURIComponent(fileId)}`);
+    const json = (await res.json()) as {
+      ok: boolean;
+      mimeType?: string;
+      base64Data?: string;
+      error?: string;
+    };
+    if (!json.ok || !json.base64Data) {
+      throw new Error(json.error || 'Failed to download audio from Google Drive');
+    }
+    const blob = base64ToBlob(json.base64Data, json.mimeType || 'audio/mpeg');
+    await saveOfflineBlob(song.id, blob);
+    return blob;
+  }
+
+  const res = await fetch(song.audio_url);
+  const blob = await res.blob();
+  await saveOfflineBlob(song.id, blob);
+  return blob;
+}
+
 export async function resolveAudioSource(song: Song): Promise<{ src: string; isObjectUrl: boolean }> {
   const cachedBlob = await getOfflineBlob(song.id);
   if (cachedBlob) {
     return { src: URL.createObjectURL(cachedBlob), isObjectUrl: true };
   }
-  if (song.id.startsWith('demo-')) {
-    const freq = song.id === 'demo-1' ? 261.63 : 329.63;
-    const demoBlob = createDemoToneWavBlob(freq, 6);
-    await saveOfflineBlob(song.id, demoBlob);
-    return { src: URL.createObjectURL(demoBlob), isObjectUrl: true };
+  if (song.id.startsWith('demo-') || song.audio_url.startsWith('gdrive://')) {
+    const blob = await fetchAndCacheAudioBlob(song);
+    return { src: URL.createObjectURL(blob), isObjectUrl: true };
   }
   return { src: song.audio_url, isObjectUrl: false };
 }
