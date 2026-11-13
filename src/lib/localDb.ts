@@ -3,7 +3,7 @@ import type { Song, SongReport } from '../types';
 const DB_NAME = 'kwp_offline_db';
 const DB_VERSION = 1;
 const BLOB_STORE = 'offline_blobs';
-const SONGS_KEY = 'kwp_local_songs_v6';
+const SONGS_KEY = 'kwp_local_songs_v7';
 const REPORTS_KEY = 'kwp_local_reports_v1';
 
 interface OfflineBlobRecord {
@@ -976,6 +976,40 @@ const DEFAULT_LOCAL_SONGS: Song[] = [
     lyrics:
       'Кел, кел бізге, Имануил,\nҚұдай бізбен бірге Имануил.\nКүтеміз біз сені, Имануил,\nТәңір бізбен бірге - Имануил.\n\n// Шаттан, шаттан, шаттан Қазақстан,\nИмануел саған келмек //',
     play_count: 150,
+    uploaded_by: 'developer',
+    status: 'published',
+    is_active: true,
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: 'song-102500',
+    title: 'Аумин (The Blessing)',
+    artist: 'Cody Carnes, Kari Jobe, Steven Furtick, Chris Brown',
+    is_unknown_author: false,
+    permission_note: 'Kazakh worship (#102500 · worshipleaderapp.com)',
+    audio_url: 'https://repo.worshipleaderapp.com/mp3/8%20Aumin.mp3',
+    storage_path: null,
+    duration_seconds: 334,
+    lyrics:
+      '[V1]\nТәңір Ие, бірге болып\nҚорған болып саған, жарылқасын\nБет жүзін, бұрып саған\nТыныштық сыйласын\n\n[C1]\nАумин, аумин, аумин\nАумин, аумин, аумин\n\n[V2]\nТәңір Ие, бірге болып\nҚорған болып саған, жарылқасын\nБет жүзін, бұрып саған\nТыныштық сыйласын\n\n[C2]\nАумин, аумин, аумин\nАумин, аумин, аумин\n/// Аумин, аумин, аумин\nАумин, аумин, аумин ///\n\n[V3]\nОл сенімен, бірге болсын\nҰрпағыңнан ұрпағыңа\nӨз үйің де, жүрегіңде\nНемереңмен, шөбереңде\n\n[V4]\nОл сенімен, бірге болсын\nҰрпағыңнан ұрпағыңа\nӨз үйің де, жүрегіңде\nНемереңмен, шөбереңде\n\n[V5]\nҚұдай жүрсін\nҚолдап, қорғап\nОл қасыңда, тастамайды\nҚамқорлайды, жетелейді\nӘрқашанда, Ол қасыңда\n\n[V6]\nТаң сәріден\nҚара түнге\nӘрбір жерде\nОл жаныңда\nЖыласаң да, қуансаң да\nОл сенімен, тастамайды\n//// Әрқашан да, Ол қасыңда ////\n\n[C3]\nАумин, аумин, аумин\nАумин, аумин, аумин',
+    play_count: 140,
+    uploaded_by: 'developer',
+    status: 'published',
+    is_active: true,
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: 'song-5821',
+    title: 'Әсем Әуен',
+    artist: 'Белгісіз автор',
+    is_unknown_author: true,
+    permission_note: 'Kazakh worship (#5821 · worshipleaderapp.com)',
+    audio_url: 'https://repo.worshipleaderapp.com/mp3/06%20_sem%20_uen.mp3',
+    storage_path: null,
+    duration_seconds: 157,
+    lyrics:
+      '[V1]\nО, Құдай қарашы маған\nЖаным ұмтылады Саған\nСаған арнап, мен ән айтам\nОян жаным, оян рухым\nТыңдашы жүректің үнін\nТән сәріде Сені мадақтаймын\n\n[C1]\n// Әсем әуен! Әсем әуен!\nТәңірге - әсем әуен!\nИса! Иса! Иса - әнімсің Сен! //',
+    play_count: 135,
     uploaded_by: 'developer',
     status: 'published',
     is_active: true,
