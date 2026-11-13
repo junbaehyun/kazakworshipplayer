@@ -36,6 +36,7 @@ export interface KaynarSong {
 export const BAKHYT_KAYNAR_AUDIO_MAP: Record<string, string> = {
   "tangirdi-madakta": "song-9685",
   "zhuregimdi-ozgertshi": "song-5856",
+  "aumin": "song-102500",
   "zharatkan-zherdi-de": "song-5855",
   "zhyr-bolyp-bizge-ashylshy": "song-5858",
 };
