@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import {
-  AlertTriangle,
   Check,
   ChevronDown,
   Download,
@@ -195,7 +194,7 @@ export function FullPlayerSheet({
         </div>
 
         {/* Bottom Mode Pills */}
-        <div className="grid grid-cols-4 gap-2 pt-1">
+        <div className="grid grid-cols-3 gap-2 pt-1">
           <button
             type="button"
             onClick={() => setShowLyrics((v) => !v)}
@@ -233,15 +232,6 @@ export function FullPlayerSheet({
             <span>
               {repeatMode === 'off' ? t.repeatOff : repeatMode === 'all' ? t.repeatAll : t.repeatOne}
             </span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => onOpenReport(song)}
-            className="py-2 rounded-xl bg-[#F5F5F7] text-[#1D1D1F] text-xs font-semibold flex items-center justify-center gap-1"
-          >
-            <AlertTriangle className="w-3.5 h-3.5 text-[#FA243C]" />
-            <span>{t.claimAuthorBtn}</span>
           </button>
         </div>
       </div>

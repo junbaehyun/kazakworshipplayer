@@ -214,24 +214,6 @@ export function App() {
             </div>
           )}
 
-          {/* Unknown Author Announcement Banner */}
-          {tab === 'listen' && (
-            <button
-              type="button"
-              onClick={() => {
-                setReportTargetSong(null);
-                setNoticeOpen(true);
-              }}
-              className="w-full text-left bg-[#FFF8F6] border border-[#FA243C]/15 rounded-2xl p-3 flex items-start justify-between gap-2.5 active:scale-[0.99] transition"
-            >
-              <div className="space-y-0.5">
-                <p className="text-xs font-bold text-[#FA243C]">{t.bannerTitle}</p>
-                <p className="text-xs text-[#515154] leading-snug">{t.bannerSub}</p>
-              </div>
-              <span className="text-xs font-bold text-[#FA243C] shrink-0 mt-0.5">›</span>
-            </button>
-          )}
-
           {/* TAB 1: LISTEN NOW */}
           {tab === 'listen' && (
             <>
