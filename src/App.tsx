@@ -157,16 +157,7 @@ export function App() {
     return playlistIds.map((id) => byId.get(id)).filter((s): s is Song => Boolean(s));
   }, [publishedSongs, playlistIds]);
 
-  const offlineOnlySongs = useMemo(
-    () => publishedSongs.filter((s) => offlineIds.includes(s.id)),
-    [publishedSongs, offlineIds]
-  );
-
-  const libraryQueue = useMemo(() => {
-    if (playlistSongs.length > 0) return playlistSongs;
-    if (offlineOnlySongs.length > 0) return offlineOnlySongs;
-    return publishedSongs;
-  }, [playlistSongs, offlineOnlySongs, publishedSongs]);
+  const libraryQueue = useMemo(() => publishedSongs, [publishedSongs]);
 
   const player = useAudioPlayer({
     songs: libraryQueue,

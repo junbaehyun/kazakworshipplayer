@@ -7,11 +7,25 @@ interface UseAudioPlayerOptions {
   onPlayCountUpdated: (songId: string, newCount: number) => void;
 }
 
+function buildShuffledIds(songs: Song[], excludeId?: string): string[] {
+  const pool = songs.length > 1 && excludeId
+    ? songs.filter((s) => s.id !== excludeId).map((s) => s.id)
+    : songs.map((s) => s.id);
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  return pool;
+}
+
 export function useAudioPlayer({ songs, onPlayCountUpdated }: UseAudioPlayerOptions) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const objectUrlRef = useRef<string | null>(null);
   const playTrackedForIdRef = useRef<string | null>(null);
   const listenedSecondsRef = useRef<number>(0);
+  const shuffleQueueRef = useRef<string[]>([]);
+  const shuffleHistoryRef = useRef<string[]>([]);
+  const skipHistoryPushRef = useRef<boolean>(false);
 
   const [currentSong, setCurrentSong] = useState<Song | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -71,6 +85,17 @@ export function useAudioPlayer({ songs, onPlayCountUpdated }: UseAudioPlayerOpti
         objectUrlRef.current = null;
       }
 
+      if (skipHistoryPushRef.current) {
+        skipHistoryPushRef.current = false;
+      } else if (currentSong?.id && currentSong.id !== song.id) {
+        const hist = shuffleHistoryRef.current;
+        if (hist[hist.length - 1] !== currentSong.id) {
+          hist.push(currentSong.id);
+          if (hist.length > 100) hist.shift();
+        }
+      }
+      shuffleQueueRef.current = shuffleQueueRef.current.filter((id) => id !== song.id);
+
       const { src, isObjectUrl } = await resolveAudioSource(song);
       if (isObjectUrl) objectUrlRef.current = src;
 
@@ -128,8 +153,19 @@ export function useAudioPlayer({ songs, onPlayCountUpdated }: UseAudioPlayerOpti
       }
 
       if (isShuffle) {
-        const candidates = songs.length > 1 ? songs.filter((s) => s.id !== currentSong?.id) : songs;
-        const pick = candidates[Math.floor(Math.random() * candidates.length)];
+        const songMap = new Map(songs.map((s) => [s.id, s]));
+        shuffleQueueRef.current = shuffleQueueRef.current.filter(
+          (id) => songMap.has(id) && (songs.length <= 1 || id !== currentSong?.id)
+        );
+        if (shuffleQueueRef.current.length === 0) {
+          if (autoAdvance && repeatMode === 'off') {
+            setIsPlaying(false);
+            return;
+          }
+          shuffleQueueRef.current = buildShuffledIds(songs, currentSong?.id);
+        }
+        const nextId = shuffleQueueRef.current.shift();
+        const pick = nextId ? songMap.get(nextId) : songs[0];
         if (pick) void playSong(pick);
         return;
       }
@@ -152,10 +188,28 @@ export function useAudioPlayer({ songs, onPlayCountUpdated }: UseAudioPlayerOpti
       audioRef.current.currentTime = 0;
       return;
     }
+    if (isShuffle && shuffleHistoryRef.current.length > 0) {
+      const songMap = new Map(songs.map((s) => [s.id, s]));
+      while (shuffleHistoryRef.current.length > 0) {
+        const prevId = shuffleHistoryRef.current.pop()!;
+        const prevSong = songMap.get(prevId);
+        if (prevSong && (songs.length <= 1 || prevSong.id !== currentSong?.id)) {
+          if (currentSong?.id) {
+            shuffleQueueRef.current = [
+              currentSong.id,
+              ...shuffleQueueRef.current.filter((id) => id !== currentSong.id),
+            ];
+          }
+          skipHistoryPushRef.current = true;
+          void playSong(prevSong);
+          return;
+        }
+      }
+    }
     const idx = currentSong ? songs.findIndex((s) => s.id === currentSong.id) : 0;
     const prevIdx = (idx - 1 + songs.length) % songs.length;
     void playSong(songs[prevIdx]);
-  }, [currentSong, playSong, songs]);
+  }, [currentSong, isShuffle, playSong, songs]);
 
   const seekTo = useCallback((seconds: number) => {
     if (!audioRef.current) return;

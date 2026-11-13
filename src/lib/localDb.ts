@@ -3,7 +3,7 @@ import type { Song, SongReport } from '../types';
 const DB_NAME = 'kwp_offline_db';
 const DB_VERSION = 1;
 const BLOB_STORE = 'offline_blobs';
-const SONGS_KEY = 'kwp_local_songs_v41';
+const SONGS_KEY = 'kwp_local_songs_v42';
 const WEEKLY_RESET_KEY = 'kwp_weekly_chart_reset_at';
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 const REPORTS_KEY = 'kwp_local_reports_v1';
@@ -1832,36 +1832,6 @@ const DEFAULT_LOCAL_SONGS: Song[] = [
     status: 'published',
     is_active: true,
     created_at: new Date().toISOString(),
-  },
-  {
-    id: 'demo-1',
-    title: 'Ұлы Құдай (Demo)',
-    artist: 'Белгісіз автор',
-    is_unknown_author: true,
-    permission_note: 'Permitted for community worship sharing',
-    audio_url: '',
-    duration_seconds: 6,
-    lyrics: 'Ұлы Құдай, Сені мадақтаймыз,\nЖүректен шыққан алғысты айтамыз.\nАспан мен жер Сенің даңқыңа толы,\nМәңгілік Патшамыз Сенсің, Иеміз!',
-    play_count: 0,
-    uploaded_by: 'developer',
-    status: 'published',
-    is_active: true,
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: 'demo-2',
-    title: 'Алғыс айтамын Саған (Demo)',
-    artist: 'Белгісіз автор',
-    is_unknown_author: true,
-    permission_note: 'Permitted for community worship sharing',
-    audio_url: '',
-    duration_seconds: 6,
-    lyrics: 'Алғыс айтамын Саған, Жаратушым,\nӘрбір таңым үшін, берген тынысың үшін.\nҚайғыда да, қуанышта да,\nСенің рақымың мені қорғайды.',
-    play_count: 0,
-    uploaded_by: 'community',
-    status: 'published',
-    is_active: true,
-    created_at: new Date(Date.now() - 86400000).toISOString(),
   },
   {
     id: 'song-akem-seni-men-suiemin',
