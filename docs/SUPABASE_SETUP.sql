@@ -177,3 +177,35 @@ SELECT
 WHERE NOT EXISTS (
     SELECT 1 FROM public.kwp_songs WHERE storage_path = '1HOiGn1spawD9U_qIrNOC66u4i5qj4LFd'
 );
+
+-- 7. Seed second test song (direct external MP3 URL — 0 server storage)
+INSERT INTO public.kwp_songs (
+    title,
+    artist,
+    is_unknown_author,
+    permission_note,
+    audio_url,
+    storage_path,
+    duration_seconds,
+    lyrics,
+    play_count,
+    uploaded_by,
+    status,
+    is_active
+)
+SELECT
+    'Жас кезімнен мені сақтап жүрдің Сен',
+    'Белгісіз автор (Шаттан 2016)',
+    true,
+    'External MP3 link test (#103021)',
+    'https://repo.worshipleaderapp.com/mp3/07%20Zhas%20kezimnen%20meni%20sak_tap%20zhurdin_%20Sen%20Track%207%201.mp3',
+    NULL,
+    377,
+    E'[V1]\nЖас кезімнен мені сақтап тұрдың Сен,\nӨмірімнің қиындығын көріп е(ді)ң.\nАзат еттің сол қиындық кезеңнен,\nАлғысымды жеткіземін әніммен.\n\n[C1]\n// Жан Ә--кем! Мейірімді Әкем!\nСа-ғын-дым мен Сені, мейірім-ді Әкем! //\n\n[V2]\nӘрқашанда ойымда Сен тұрасың,\nЖаңа өмір сыйлап мені қуанттың.\nБұл өмірде Сенің асыл Сөзіңе,\nОрын берем жүрегімнің төрінен.',
+    1,
+    'developer',
+    'published',
+    true
+WHERE NOT EXISTS (
+    SELECT 1 FROM public.kwp_songs WHERE audio_url = 'https://repo.worshipleaderapp.com/mp3/07%20Zhas%20kezimnen%20meni%20sak_tap%20zhurdin_%20Sen%20Track%207%201.mp3'
+);

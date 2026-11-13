@@ -3,7 +3,7 @@ import type { Song, SongReport } from '../types';
 const DB_NAME = 'kwp_offline_db';
 const DB_VERSION = 1;
 const BLOB_STORE = 'offline_blobs';
-const SONGS_KEY = 'kwp_local_songs_v2';
+const SONGS_KEY = 'kwp_local_songs_v3';
 const REPORTS_KEY = 'kwp_local_reports_v1';
 
 interface OfflineBlobRecord {
@@ -131,6 +131,23 @@ export function createDemoToneWavBlob(freqHz = 261.63, seconds = 6): Blob {
 }
 
 const DEFAULT_LOCAL_SONGS: Song[] = [
+  {
+    id: 'song-103021',
+    title: 'Жас кезімнен мені сақтап жүрдің Сен',
+    artist: 'Белгісіз автор (Шаттан 2016)',
+    is_unknown_author: true,
+    permission_note: 'External MP3 link test (#103021)',
+    audio_url: 'https://repo.worshipleaderapp.com/mp3/07%20Zhas%20kezimnen%20meni%20sak_tap%20zhurdin_%20Sen%20Track%207%201.mp3',
+    storage_path: null,
+    duration_seconds: 377,
+    lyrics:
+      '[V1]\nЖас кезімнен мені сақтап тұрдың Сен,\nӨмірімнің қиындығын көріп е(ді)ң.\nАзат еттің сол қиындық кезеңнен,\nАлғысымды жеткіземін әніммен.\n\n[C1]\n// Жан Ә--кем! Мейірімді Әкем!\nСа-ғын-дым мен Сені, мейірім-ді Әкем! //\n\n[V2]\nӘрқашанда ойымда Сен тұрасың,\nЖаңа өмір сыйлап мені қуанттың.\nБұл өмірде Сенің асыл Сөзіңе,\nОрын берем жүрегімнің төрінен.',
+    play_count: 132,
+    uploaded_by: 'developer',
+    status: 'published',
+    is_active: true,
+    created_at: new Date().toISOString(),
+  },
   {
     id: 'song-5887',
     title: 'Кел, кел бізге Имануил',
