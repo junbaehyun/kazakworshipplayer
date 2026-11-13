@@ -1,4 +1,4 @@
-import { Check, Download, ListCheck, ListPlus, Music2, Pause, Play } from 'lucide-react';
+import { Heart, ListCheck, ListPlus, Music2, Pause, Play } from 'lucide-react';
 import type { TranslationStrings } from '../i18n/translations';
 import type { Song } from '../types';
 
@@ -21,13 +21,15 @@ interface SongRowProps {
   rank?: number;
   isCurrent: boolean;
   isPlaying: boolean;
-  isOffline: boolean;
-  isSavingOffline: boolean;
+  isOffline?: boolean;
+  isSavingOffline?: boolean;
   isInPlaylist?: boolean;
+  isLiked?: boolean;
   t: TranslationStrings;
   onPlay: (song: Song) => void;
-  onToggleOffline: (song: Song) => void;
+  onToggleOffline?: (song: Song) => void;
   onTogglePlaylist?: (song: Song) => void;
+  onToggleLike?: (song: Song) => void;
   onOpenReport?: (song: Song) => void;
 }
 
@@ -36,13 +38,12 @@ export function SongRow({
   rank,
   isCurrent,
   isPlaying,
-  isOffline,
-  isSavingOffline,
   isInPlaylist = false,
+  isLiked = false,
   t,
   onPlay,
-  onToggleOffline,
   onTogglePlaylist,
+  onToggleLike,
 }: SongRowProps) {
   const authorLabel = song.is_unknown_author ? t.unknownAuthor : song.artist;
   const gradient = getSongGradient(song.id);
@@ -110,25 +111,20 @@ export function SongRow({
           </button>
         )}
 
-        <button
-          type="button"
-          onClick={() => onToggleOffline(song)}
-          disabled={isSavingOffline}
-          title={isOffline ? t.savedOffline : t.saveOffline}
-          className={`w-8 h-8 rounded-full flex items-center justify-center transition ${
-            isOffline
-              ? 'bg-[#34C759]/15 text-[#34C759]'
-              : 'bg-[#F5F5F7] text-[#86868B] active:bg-black/10'
-          }`}
-        >
-          {isSavingOffline ? (
-            <span className="w-3 h-3 border-2 border-[#FA243C] border-t-transparent rounded-full animate-spin" />
-          ) : isOffline ? (
-            <Check className="w-3.5 h-3.5 stroke-[2.5]" />
-          ) : (
-            <Download className="w-3.5 h-3.5" />
-          )}
-        </button>
+        {onToggleLike && (
+          <button
+            type="button"
+            onClick={() => onToggleLike(song)}
+            aria-label="Like"
+            className={`w-8 h-8 rounded-full flex items-center justify-center transition ${
+              isLiked
+                ? 'bg-[#FA243C]/12 text-[#FA243C]'
+                : 'bg-[#F5F5F7] text-[#86868B] active:bg-black/10'
+            }`}
+          >
+            <Heart className={`w-3.5 h-3.5 ${isLiked ? 'fill-[#FA243C]' : ''}`} />
+          </button>
+        )}
       </div>
     </div>
   );

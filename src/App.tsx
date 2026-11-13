@@ -3,12 +3,10 @@ import type { Session } from '@supabase/supabase-js';
 import {
   ArrowLeft,
   BookOpen,
-  Info,
   Music,
-  Play,
   Search,
   Settings,
-  Shuffle,
+  X,
 } from 'lucide-react';
 import { BakhytKaynarView } from './components/BakhytKaynarView';
 import { FullPlayerSheet } from './components/FullPlayerSheet';
@@ -32,6 +30,7 @@ import type { Language, Song, TabId } from './types';
 
 const LANGS: Language[] = ['kk', 'ko', 'en', 'ru'];
 const PLAYLIST_KEY = 'kwp_playlist_ids_v1';
+const LIKED_KEY = 'kwp_liked_ids_v1';
 const DEV_KAYNAR_KEY = 'kwp_dev_show_kaynar';
 
 export function App() {
@@ -51,15 +50,25 @@ export function App() {
       return [];
     }
   });
+  const [likedIds, setLikedIds] = useState<string[]>(() => {
+    try {
+      const raw = localStorage.getItem(LIKED_KEY);
+      const parsed = raw ? (JSON.parse(raw) as unknown) : [];
+      return Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === 'string') : [];
+    } catch {
+      return [];
+    }
+  });
   const [offlineIds, setOfflineIds] = useState<string[]>([]);
   const [offlineBytes, setOfflineBytes] = useState<number>(0);
   const [savingOfflineId, setSavingOfflineId] = useState<string | null>(null);
   const [isFullPlayerOpen, setIsFullPlayerOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [noticeOpen, setNoticeOpen] = useState(false);
   const [reportTargetSong, setReportTargetSong] = useState<Song | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [showKaynarTab, setShowKaynarTab] = useState<boolean>(() => {
-    return localStorage.getItem(DEV_KAYNAR_KEY) === 'true';
+    return localStorage.getItem(DEV_KAYNAR_KEY) !== 'false';
   });
   const hasAutoLoadedRef = useRef(false);
 
@@ -117,6 +126,20 @@ export function App() {
         : [song.id, ...prev];
       try {
         localStorage.setItem(PLAYLIST_KEY, JSON.stringify(next));
+      } catch {
+        // Ignore storage errors
+      }
+      return next;
+    });
+  }, []);
+
+  const handleToggleLike = useCallback((song: Song) => {
+    setLikedIds((prev) => {
+      const next = prev.includes(song.id)
+        ? prev.filter((id) => id !== song.id)
+        : [song.id, ...prev];
+      try {
+        localStorage.setItem(LIKED_KEY, JSON.stringify(next));
       } catch {
         // Ignore storage errors
       }
@@ -258,16 +281,10 @@ export function App() {
               </div>
               <button
                 type="button"
-                onClick={() =>
-                  setTab(
-                    tab === 'settings' || tab === 'chart' || tab === 'offline' || tab === 'upload'
-                      ? 'listen'
-                      : 'settings'
-                  )
-                }
+                onClick={() => setIsSettingsOpen((prev) => !prev)}
                 aria-label={t.tabSettings}
                 className={`w-7 h-7 rounded-lg flex items-center justify-center border transition ${
-                  tab === 'settings' || tab === 'chart' || tab === 'offline' || tab === 'upload'
+                  isSettingsOpen || tab === 'chart' || tab === 'offline' || tab === 'upload'
                     ? 'bg-[#FA243C] text-white border-[#FA243C]'
                     : 'bg-[#F5F5F7] text-[#1D1D1F] border-black/[0.04]'
                 }`}
@@ -277,20 +294,11 @@ export function App() {
             </div>
           </div>
 
-          <div className="flex items-baseline justify-between mt-2">
-            <h1 className="text-2xl font-extrabold tracking-tight text-[#1D1D1F]">{pageTitle}</h1>
-            <button
-              type="button"
-              onClick={() => {
-                setReportTargetSong(null);
-                setNoticeOpen(true);
-              }}
-              className="text-xs font-semibold text-[#FA243C] flex items-center gap-1 active:opacity-70"
-            >
-              <Info className="w-3.5 h-3.5" />
-              <span>{t.noticeBtn}</span>
-            </button>
-          </div>
+          {tab !== 'listen' && (
+            <div className="flex items-baseline justify-between mt-2">
+              <h1 className="text-2xl font-extrabold tracking-tight text-[#1D1D1F]">{pageTitle}</h1>
+            </div>
+          )}
         </header>
 
         {/* Main Scrollable Area */}
@@ -313,30 +321,6 @@ export function App() {
           {tab === 'listen' && (
             <>
               <InstallPromptBanner t={t} />
-              {libraryQueue.length > 0 && (
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    type="button"
-                    onClick={() => void player.playSong(libraryQueue[0])}
-                    className="py-2.5 rounded-xl bg-[#F5F5F7] active:bg-black/10 text-[#FA243C] font-bold text-xs flex items-center justify-center gap-1.5 transition"
-                  >
-                    <Play className="w-3.5 h-3.5 fill-[#FA243C]" />
-                    <span>{t.playBtn}</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!player.isShuffle) player.toggleShuffle();
-                      const pick = libraryQueue[Math.floor(Math.random() * libraryQueue.length)];
-                      if (pick) void player.playSong(pick);
-                    }}
-                    className="py-2.5 rounded-xl bg-[#F5F5F7] active:bg-black/10 text-[#FA243C] font-bold text-xs flex items-center justify-center gap-1.5 transition"
-                  >
-                    <Shuffle className="w-3.5 h-3.5" />
-                    <span>{t.shuffleBtn}</span>
-                  </button>
-                </div>
-              )}
 
               {/* My Playlist Section */}
               {!search.trim() && playlistSongs.length > 0 && (
@@ -363,6 +347,8 @@ export function App() {
                         onPlay={(song) => void player.playSong(song)}
                         onToggleOffline={(song) => void handleToggleOffline(song)}
                         onTogglePlaylist={handleTogglePlaylist}
+                        isLiked={likedIds.includes(s.id)}
+                        onToggleLike={handleToggleLike}
                         onOpenReport={(song) => {
                           setReportTargetSong(song);
                           setNoticeOpen(true);
@@ -375,9 +361,6 @@ export function App() {
 
               {/* All Songs List */}
               <section className="space-y-1">
-                <h2 className="text-sm font-extrabold tracking-tight text-[#1D1D1F] mb-1">
-                  {t.allSongsTitle}
-                </h2>
                 {filteredSongs.length === 0 ? (
                   <p className="text-xs text-[#86868B] text-center py-8">{t.noSongsFound}</p>
                 ) : (
@@ -396,6 +379,8 @@ export function App() {
                         onPlay={(song) => void player.playSong(song)}
                         onToggleOffline={(song) => void handleToggleOffline(song)}
                         onTogglePlaylist={handleTogglePlaylist}
+                        isLiked={likedIds.includes(s.id)}
+                        onToggleLike={handleToggleLike}
                         onOpenReport={(song) => {
                           setReportTargetSong(song);
                           setNoticeOpen(true);
@@ -414,7 +399,10 @@ export function App() {
               <div className="flex items-center justify-between gap-2">
                 <button
                   type="button"
-                  onClick={() => setTab('settings')}
+                  onClick={() => {
+                    setTab('listen');
+                    setIsSettingsOpen(true);
+                  }}
                   className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#FA243C] active:opacity-70"
                 >
                   <ArrowLeft className="w-4 h-4" />
@@ -445,6 +433,8 @@ export function App() {
                       onPlay={(song) => void player.playSong(song)}
                       onToggleOffline={(song) => void handleToggleOffline(song)}
                       onTogglePlaylist={handleTogglePlaylist}
+                        isLiked={likedIds.includes(s.id)}
+                        onToggleLike={handleToggleLike}
                       onOpenReport={(song) => {
                         setReportTargetSong(song);
                         setNoticeOpen(true);
@@ -472,7 +462,10 @@ export function App() {
             <div className="space-y-5">
               <button
                 type="button"
-                onClick={() => setTab('settings')}
+                onClick={() => {
+                  setTab('listen');
+                  setIsSettingsOpen(true);
+                }}
                 className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#FA243C] active:opacity-70"
               >
                 <ArrowLeft className="w-4 h-4" />
@@ -501,6 +494,8 @@ export function App() {
                         onPlay={(song) => void player.playSong(song)}
                         onToggleOffline={(song) => void handleToggleOffline(song)}
                         onTogglePlaylist={handleTogglePlaylist}
+                        isLiked={likedIds.includes(s.id)}
+                        onToggleLike={handleToggleLike}
                         onOpenReport={(song) => {
                           setReportTargetSong(song);
                           setNoticeOpen(true);
@@ -535,6 +530,8 @@ export function App() {
                         onPlay={(song) => void player.playSong(song)}
                         onToggleOffline={(song) => void handleToggleOffline(song)}
                         onTogglePlaylist={handleTogglePlaylist}
+                        isLiked={likedIds.includes(s.id)}
+                        onToggleLike={handleToggleLike}
                         onOpenReport={(song) => {
                           setReportTargetSong(song);
                           setNoticeOpen(true);
@@ -552,7 +549,10 @@ export function App() {
             <div className="space-y-3">
               <button
                 type="button"
-                onClick={() => setTab('settings')}
+                onClick={() => {
+                  setTab('listen');
+                  setIsSettingsOpen(true);
+                }}
                 className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#FA243C] active:opacity-70"
               >
                 <ArrowLeft className="w-4 h-4" />
@@ -569,44 +569,32 @@ export function App() {
             </div>
           )}
 
-          {/* TAB 5: SETTINGS & ADMIN */}
-          {tab === 'settings' && (
-            <SettingsAdminView
-              t={t}
-              session={session}
-              offlineCount={offlineIds.length}
-              offlineBytes={offlineBytes}
-              songs={songs}
-              showKaynarTab={showKaynarTab}
-              onToggleKaynarTab={handleToggleKaynarTab}
-              onClearOffline={handleClearOffline}
-              onSessionChange={setSession}
-              onRefreshSongs={refreshSongs}
-              onOpenNotice={() => {
-                setReportTargetSong(null);
-                setNoticeOpen(true);
-              }}
-              onNavigateTab={(nextTab) => setTab(nextTab)}
-              onResetWeeklyChart={handleResetWeeklyChart}
-            />
-          )}
         </main>
 
         {/* Floating Frosted Mini-Player */}
-        {player.currentSong && (
-          <MiniPlayer
-            song={player.currentSong}
-            isPlaying={player.isPlaying}
-            isOffline={offlineIds.includes(player.currentSong.id)}
-            hasBottomNav={showKaynarTab}
-            currentTime={player.currentTime}
-            duration={player.duration}
-            t={t}
-            onExpand={() => setIsFullPlayerOpen(true)}
-            onTogglePlay={() => void player.togglePlay()}
-            onNext={() => player.playNext(false)}
-          />
-        )}
+        <MiniPlayer
+          song={player.currentSong}
+          isPlaying={player.isPlaying}
+          isOffline={player.currentSong ? offlineIds.includes(player.currentSong.id) : false}
+          isShuffle={player.isShuffle}
+          hasSongs={libraryQueue.length > 0}
+          hasBottomNav={showKaynarTab}
+          currentTime={player.currentTime}
+          duration={player.duration}
+          t={t}
+          onExpand={() => setIsFullPlayerOpen(true)}
+          onTogglePlay={() => void player.togglePlay()}
+          onNext={() => player.playNext(false)}
+          onPlayFirst={() => {
+            if (libraryQueue[0]) void player.playSong(libraryQueue[0]);
+          }}
+          onShufflePlay={() => {
+            if (!player.isShuffle) player.toggleShuffle();
+            const pick = libraryQueue[Math.floor(Math.random() * libraryQueue.length)];
+            if (pick) void player.playSong(pick);
+          }}
+          onToggleShuffle={player.toggleShuffle}
+        />
 
         {/* Bottom Mobile Tab Bar (Shown only when Бақыт қайнар menu is enabled in Dev Settings) */}
         {showKaynarTab && (
@@ -666,6 +654,58 @@ export function App() {
               setNoticeOpen(true);
             }}
           />
+        )}
+
+        {/* Settings Drawer */}
+        {isSettingsOpen && (
+          <div
+            className="fixed inset-0 z-40 flex justify-center bg-black/30 backdrop-blur-xs"
+            onClick={() => setIsSettingsOpen(false)}
+          >
+            <div className="w-full max-w-[430px] h-full flex justify-end pointer-events-none">
+              <aside
+                className="w-[88%] max-w-[360px] h-full bg-white shadow-2xl border-l border-black/[0.06] flex flex-col pointer-events-auto"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="px-5 py-4 border-b border-black/[0.06] flex items-center justify-between shrink-0">
+                  <h2 className="text-lg font-extrabold tracking-tight text-[#1D1D1F]">
+                    {t.settingsTitle}
+                  </h2>
+                  <button
+                    type="button"
+                    onClick={() => setIsSettingsOpen(false)}
+                    aria-label="Close"
+                    className="w-8 h-8 rounded-full bg-[#F5F5F7] text-[#1D1D1F] flex items-center justify-center active:opacity-70"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+                <div className="flex-1 overflow-y-auto px-4 py-4 pb-24">
+                  <SettingsAdminView
+                    t={t}
+                    session={session}
+                    offlineCount={offlineIds.length}
+                    offlineBytes={offlineBytes}
+                    songs={songs}
+                    showKaynarTab={showKaynarTab}
+                    onToggleKaynarTab={handleToggleKaynarTab}
+                    onClearOffline={handleClearOffline}
+                    onSessionChange={setSession}
+                    onRefreshSongs={refreshSongs}
+                    onOpenNotice={() => {
+                      setReportTargetSong(null);
+                      setNoticeOpen(true);
+                    }}
+                    onNavigateTab={(nextTab) => {
+                      setTab(nextTab);
+                      setIsSettingsOpen(false);
+                    }}
+                    onResetWeeklyChart={handleResetWeeklyChart}
+                  />
+                </div>
+              </aside>
+            </div>
+          </div>
         )}
 
         {/* Copyright / Message Sheet */}

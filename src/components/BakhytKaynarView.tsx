@@ -39,6 +39,8 @@ export function BakhytKaynarView({
   const [showMeaning, setShowMeaning] = useState(true);
   const [showKoHymn, setShowKoHymn] = useState(true);
   const [showEnglish, setShowEnglish] = useState(true);
+  const [worshipLeaderMode, setWorshipLeaderMode] = useState(false);
+  const [transpose, setTranspose] = useState(0);
   const [fontLevel, setFontLevel] = useState(1);
 
   const filteredSongs = useMemo(() => {
@@ -74,6 +76,7 @@ export function BakhytKaynarView({
   const openSong = (slug: string) => {
     setSelectedSlug(slug);
     setSectionIdx(0);
+    setTranspose(0);
   };
 
   // 1. Song List View (13 songs)
@@ -85,16 +88,16 @@ export function BakhytKaynarView({
             <p className="text-sm font-extrabold text-[#1D1D1F]">Бақыт қайнар (바컷 카이나르)</p>
             <p className="text-xs text-[#515154]">
               {lang === 'ko'
-                ? '카자흐어 · 한글 읽기 · 의미 · 한국 찬양 (13곡)'
+                ? `카자흐어 · 한글 읽기 · 의미 · 한국 찬양 (${bakhytKaynarSongs.length}곡)`
                 : lang === 'kk'
-                ? 'Қазақша · Оқылуы · Мағынасы · Корейше (13 ән)'
+                ? `Қазақша · Оқылуы · Мағынасы · Корейше (${bakhytKaynarSongs.length} ән)`
                 : lang === 'ru'
-                ? 'Казахский · Чтение · Перевод · Корейский (13 песен)'
-                : 'Kazakh · Korean Reading · Meaning · Hymn (13 songs)'}
+                ? `Казахский · Чтение · Перевод · Корейский (${bakhytKaynarSongs.length} песен)`
+                : `Kazakh · Korean Reading · Meaning · Hymn (${bakhytKaynarSongs.length} songs)`}
             </p>
           </div>
           <span className="px-2.5 py-1 rounded-full bg-[#FA243C]/10 text-[#FA243C] text-xs font-bold shrink-0">
-            13
+            {bakhytKaynarSongs.length}
           </span>
         </div>
 
@@ -122,10 +125,12 @@ export function BakhytKaynarView({
                   </span>
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-bold text-[#1D1D1F] truncate">{item.title.kk}</p>
-                    <p className="text-xs text-[#86868B] truncate">
-                      {item.title.koHymn || item.title.ko}
-                      {item.title.reading ? ` · ${item.title.reading}` : ''}
-                    </p>
+                    {lang === 'ko' && (item.title.koHymn || item.title.ko || item.title.reading) && (
+                      <p className="text-xs text-[#86868B] truncate">
+                        {item.title.koHymn || item.title.ko}
+                        {item.title.reading ? ` · ${item.title.reading}` : ''}
+                      </p>
+                    )}
                   </div>
                 </button>
 
@@ -171,6 +176,7 @@ export function BakhytKaynarView({
   const font = FONT_SCALES[fontLevel] || FONT_SCALES[1];
   const hasKoreanHymn = activeSong.hasKoreanHymn !== false;
   const hasEnglish = Boolean(activeSong.hasEnglish);
+  const hasChords = sections.some((sec) => sec.lines.some((l) => Boolean(l.chords)));
   const linkedAudio = findLinkedAudio(activeSong.id);
   const isCurrAudio = Boolean(linkedAudio && currentSong?.id === linkedAudio.id);
 
@@ -179,7 +185,7 @@ export function BakhytKaynarView({
       ...line,
       sIdx,
       lIdx,
-      sectionLabel: sec.label[lang === 'kk' ? 'kk' : 'ko'] || sec.label.ko || sec.label.kk,
+      sectionLabel: sec.label[lang === 'ko' ? 'ko' : 'kk'] || sec.label.kk || sec.label.ko,
       sectionKind: sec.kind,
       isSectionStart: lIdx === 0,
     }))
@@ -195,14 +201,16 @@ export function BakhytKaynarView({
           className="px-2.5 py-1.5 rounded-full bg-[#F5F5F7] text-xs font-bold text-[#1D1D1F] flex items-center gap-1 active:scale-95 transition shrink-0"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
-          <span>{songIndex + 1}/13</span>
+          <span>{songIndex + 1}/{bakhytKaynarSongs.length}</span>
         </button>
 
         <div className="min-w-0 flex-1 text-center">
           <p className="text-sm font-extrabold text-[#1D1D1F] truncate">{activeSong.title.kk}</p>
-          <p className="text-[11px] font-medium text-[#86868B] truncate">
-            {activeSong.title.koHymn || activeSong.title.ko}
-          </p>
+          {lang === 'ko' && (activeSong.title.koHymn || activeSong.title.ko) && (
+            <p className="text-[11px] font-medium text-[#86868B] truncate">
+              {activeSong.title.koHymn || activeSong.title.ko}
+            </p>
+          )}
         </div>
 
         {linkedAudio ? (
@@ -227,16 +235,29 @@ export function BakhytKaynarView({
       {/* Layer Toggle Chips + Font Size Control */}
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
-          <LayerChip active={showReading} onClick={() => setShowReading((v) => !v)}>
-            읽기
+          <LayerChip active={worshipLeaderMode} onClick={() => setWorshipLeaderMode((v) => !v)}>
+            {lang === 'ko'
+              ? '악보 코드'
+              : lang === 'kk'
+              ? 'Аккордтар'
+              : lang === 'ru'
+              ? 'Аккорды'
+              : 'Chords'}
           </LayerChip>
-          <LayerChip active={showMeaning} onClick={() => setShowMeaning((v) => !v)}>
-            의미
-          </LayerChip>
-          {hasKoreanHymn && (
-            <LayerChip active={showKoHymn} onClick={() => setShowKoHymn((v) => !v)}>
-              {activeSong.hymnChip || '한국 찬양'}
-            </LayerChip>
+          {lang === 'ko' && (
+            <>
+              <LayerChip active={showReading} onClick={() => setShowReading((v) => !v)}>
+                읽기
+              </LayerChip>
+              <LayerChip active={showMeaning} onClick={() => setShowMeaning((v) => !v)}>
+                의미
+              </LayerChip>
+              {hasKoreanHymn && (
+                <LayerChip active={showKoHymn} onClick={() => setShowKoHymn((v) => !v)}>
+                  {activeSong.hymnChip || '한국 찬양'}
+                </LayerChip>
+              )}
+            </>
           )}
           {hasEnglish && (
             <LayerChip active={showEnglish} onClick={() => setShowEnglish((v) => !v)}>
@@ -276,6 +297,59 @@ export function BakhytKaynarView({
         </div>
       </div>
 
+      {/* Worship Leader Mode: Key & Transpose Bar */}
+      {worshipLeaderMode && (
+        <div className="flex items-center justify-between gap-2 rounded-xl border border-[#FA243C]/20 bg-[#FFF8F6] px-3 py-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-[11px] font-extrabold text-[#FA243C] uppercase tracking-wider">
+              {lang === 'ko' ? '악보 코드' : 'Chords'}
+            </span>
+            {activeSong.songKey ? (
+              <span className="rounded-md bg-white px-2 py-0.5 text-xs font-extrabold text-[#1D1D1F] border border-black/[0.06]">
+                Key: {transposeChord(activeSong.songKey, transpose)}
+                {activeSong.capo ? ` (Capo ${activeSong.capo})` : ''}
+              </span>
+            ) : null}
+            {!hasChords && (
+              <span className="text-[11px] text-[#86868B] truncate">
+                {lang === 'ko'
+                  ? '코드 준비 중'
+                  : lang === 'kk'
+                  ? 'Аккордтар дайындалуда'
+                  : lang === 'ru'
+                  ? 'Аккорды готовятся'
+                  : 'Chords coming soon'}
+              </span>
+            )}
+          </div>
+          {hasChords && (
+            <div className="inline-flex items-center gap-1 shrink-0">
+              <button
+                type="button"
+                onClick={() => setTranspose((t) => Math.max(-6, t - 1))}
+                className="w-7 h-7 rounded-lg bg-white border border-black/[0.08] text-xs font-bold text-[#1D1D1F] active:scale-95"
+              >
+                -
+              </button>
+              <button
+                type="button"
+                onClick={() => setTranspose(0)}
+                className="px-2 h-7 rounded-lg bg-white border border-black/[0.08] text-[11px] font-bold text-[#515154]"
+              >
+                {transpose === 0 ? '0' : transpose > 0 ? `+${transpose}` : transpose}
+              </button>
+              <button
+                type="button"
+                onClick={() => setTranspose((t) => Math.min(6, t + 1))}
+                className="w-7 h-7 rounded-lg bg-white border border-black/[0.08] text-xs font-bold text-[#1D1D1F] active:scale-95"
+              >
+                +
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Main Lyric Card */}
       <div className="rounded-2xl border border-black/[0.08] bg-white shadow-xs overflow-hidden">
         {/* Section Tabs + Scroll/Page Toggle */}
@@ -293,7 +367,7 @@ export function BakhytKaynarView({
                       : 'text-[#86868B]'
                   }`}
                 >
-                  {sec.label[lang === 'kk' ? 'kk' : 'ko'] || sec.label.ko || sec.label.kk}
+                  {sec.label[lang === 'ko' ? 'ko' : 'kk'] || sec.label.kk || sec.label.ko}
                 </button>
               ))
             ) : (
@@ -346,10 +420,12 @@ export function BakhytKaynarView({
                 <LyricLineCard
                   line={line}
                   font={font}
-                  showReading={showReading}
-                  showMeaning={showMeaning}
-                  showKoHymn={showKoHymn}
+                  showReading={lang === 'ko' && showReading}
+                  showMeaning={lang === 'ko' && showMeaning}
+                  showKoHymn={lang === 'ko' && showKoHymn}
                   showEnglish={showEnglish}
+                  showChords={worshipLeaderMode}
+                  transpose={transpose}
                 />
               </div>
             ))}
@@ -361,10 +437,12 @@ export function BakhytKaynarView({
                 key={`${currentSection?.id}-${i}`}
                 line={line}
                 font={font}
-                showReading={showReading}
-                showMeaning={showMeaning}
-                showKoHymn={showKoHymn}
+                showReading={lang === 'ko' && showReading}
+                showMeaning={lang === 'ko' && showMeaning}
+                showKoHymn={lang === 'ko' && showKoHymn}
                 showEnglish={showEnglish}
+                showChords={worshipLeaderMode}
+                transpose={transpose}
               />
             ))}
           </div>
@@ -422,6 +500,52 @@ function LayerChip({
   );
 }
 
+const SHARP_SCALE = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+const FLAT_TO_SHARP: Record<string, string> = {
+  Db: 'C#',
+  Eb: 'D#',
+  Gb: 'F#',
+  Ab: 'G#',
+  Bb: 'A#',
+};
+
+function transposeNote(note: string, semitones: number): string {
+  if (!semitones) return note;
+  const normalized = FLAT_TO_SHARP[note] || note;
+  const idx = SHARP_SCALE.indexOf(normalized);
+  if (idx < 0) return note;
+  return SHARP_SCALE[(idx + semitones + 120) % 12];
+}
+
+function transposeChord(chord: string, semitones: number): string {
+  if (!semitones) return chord;
+  return chord.replace(/([A-G][#b]?)/g, (m) => transposeNote(m, semitones));
+}
+
+function parseChordedLine(
+  chorded: string,
+  semitones: number
+): Array<{ chord?: string; text: string }> {
+  const parts: Array<{ chord?: string; text: string }> = [];
+  const regex = /\[([^\]]+)\]([^\[]*)/g;
+  let lastIdx = 0;
+  let match: RegExpExecArray | null;
+  while ((match = regex.exec(chorded)) !== null) {
+    if (match.index > lastIdx) {
+      parts.push({ text: chorded.slice(lastIdx, match.index) });
+    }
+    parts.push({
+      chord: transposeChord(match[1].trim(), semitones),
+      text: match[2],
+    });
+    lastIdx = regex.lastIndex;
+  }
+  if (lastIdx < chorded.length) {
+    parts.push({ text: chorded.slice(lastIdx) });
+  }
+  return parts;
+}
+
 function LyricLineCard({
   line,
   font,
@@ -429,6 +553,8 @@ function LyricLineCard({
   showMeaning,
   showKoHymn,
   showEnglish,
+  showChords,
+  transpose,
 }: {
   line: KaynarLyricLine;
   font: (typeof FONT_SCALES)[number];
@@ -436,10 +562,28 @@ function LyricLineCard({
   showMeaning: boolean;
   showKoHymn: boolean;
   showEnglish: boolean;
+  showChords: boolean;
+  transpose: number;
 }) {
+  const chordSegments =
+    showChords && line.chords ? parseChordedLine(line.chords, transpose) : null;
+
   return (
     <article className="px-4 py-3.5">
-      <p className={`font-bold leading-snug text-[#1D1D1F] ${font.kk}`}>{line.kk}</p>
+      {chordSegments ? (
+        <div className={`flex flex-wrap items-end leading-snug text-[#1D1D1F] ${font.kk}`}>
+          {chordSegments.map((seg, idx) => (
+            <span key={idx} className="inline-flex flex-col items-start whitespace-pre-wrap">
+              <span className="text-[11px] font-extrabold font-mono text-[#FA243C] leading-none mb-1 min-h-[12px]">
+                {seg.chord || '\u00A0'}
+              </span>
+              <span className="font-bold">{seg.text || '\u00A0'}</span>
+            </span>
+          ))}
+        </div>
+      ) : (
+        <p className={`font-bold leading-snug text-[#1D1D1F] ${font.kk}`}>{line.kk}</p>
+      )}
       {showReading && line.reading && (
         <p className={`mt-1.5 font-medium leading-snug text-sky-700 ${font.reading}`}>
           {line.reading}

@@ -1,12 +1,14 @@
-import { Music2, Pause, Play, SkipForward } from 'lucide-react';
+import { Music2, Pause, Play, Shuffle, SkipForward } from 'lucide-react';
 import type { TranslationStrings } from '../i18n/translations';
 import type { Song } from '../types';
 import { getSongGradient } from './SongRow';
 
 interface MiniPlayerProps {
-  song: Song;
+  song: Song | null;
   isPlaying: boolean;
   isOffline: boolean;
+  isShuffle: boolean;
+  hasSongs: boolean;
   hasBottomNav?: boolean;
   currentTime: number;
   duration: number;
@@ -14,12 +16,17 @@ interface MiniPlayerProps {
   onExpand: () => void;
   onTogglePlay: () => void;
   onNext: () => void;
+  onPlayFirst: () => void;
+  onShufflePlay: () => void;
+  onToggleShuffle: () => void;
 }
 
 export function MiniPlayer({
   song,
   isPlaying,
   isOffline,
+  isShuffle,
+  hasSongs,
   hasBottomNav = true,
   currentTime,
   duration,
@@ -27,7 +34,38 @@ export function MiniPlayer({
   onExpand,
   onTogglePlay,
   onNext,
+  onPlayFirst,
+  onShufflePlay,
+  onToggleShuffle,
 }: MiniPlayerProps) {
+  if (!song) {
+    if (!hasSongs) return null;
+    return (
+      <div
+        className={`fixed ${hasBottomNav ? 'bottom-[64px]' : 'bottom-3'} left-1/2 -translate-x-1/2 w-[calc(100%-24px)] max-w-[406px] z-30 bg-white/90 backdrop-blur-xl rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.10)] border border-black/[0.06] p-2`}
+      >
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={onPlayFirst}
+            className="py-2.5 rounded-xl bg-[#F5F5F7] active:bg-black/10 text-[#FA243C] font-bold text-xs flex items-center justify-center gap-1.5 transition"
+          >
+            <Play className="w-3.5 h-3.5 fill-[#FA243C]" />
+            <span>{t.playBtn}</span>
+          </button>
+          <button
+            type="button"
+            onClick={onShufflePlay}
+            className="py-2.5 rounded-xl bg-[#F5F5F7] active:bg-black/10 text-[#FA243C] font-bold text-xs flex items-center justify-center gap-1.5 transition"
+          >
+            <Shuffle className="w-3.5 h-3.5" />
+            <span>{t.shuffleBtn}</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   const progress = duration > 0 ? Math.min(100, (currentTime / duration) * 100) : 0;
   const author = song.is_unknown_author ? t.unknownAuthor : song.artist;
   const gradient = getSongGradient(song.id);
@@ -52,7 +90,17 @@ export function MiniPlayer({
           </div>
         </div>
 
-        <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center gap-0.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+          <button
+            type="button"
+            onClick={onToggleShuffle}
+            aria-label={t.shuffleBtn}
+            className={`w-8 h-8 rounded-full flex items-center justify-center active:bg-black/5 transition ${
+              isShuffle ? 'text-[#FA243C]' : 'text-[#86868B]'
+            }`}
+          >
+            <Shuffle className="w-3.5 h-3.5" />
+          </button>
           <button
             type="button"
             onClick={onTogglePlay}
