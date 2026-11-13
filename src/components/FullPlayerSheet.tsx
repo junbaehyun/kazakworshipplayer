@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import type { TranslationStrings } from '../i18n/translations';
 import type { RepeatMode, Song } from '../types';
+import { LyricsView } from './LyricsView';
 import { getSongGradient } from './SongRow';
 
 interface FullPlayerSheetProps {
@@ -112,23 +113,18 @@ export function FullPlayerSheet({
           </div>
         </div>
       ) : (
-        <div className="my-auto bg-[#F5F5F7] rounded-3xl p-5 max-h-64 overflow-y-auto space-y-2 border border-black/[0.04]">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-[#FA243C]">
-              {t.lyricsBtn}
-            </span>
-            <button
-              type="button"
-              onClick={() => setShowLyrics(false)}
-              className="text-xs font-semibold text-[#86868B]"
-            >
-              ✕
-            </button>
-          </div>
-          <p className="text-sm font-semibold text-[#1D1D1F] whitespace-pre-line leading-relaxed">
-            {song.lyrics || '—'}
-          </p>
-        </div>
+        <LyricsView
+          lyrics={song.lyrics ?? ''}
+          title={song.title}
+          author={author}
+          gradient={gradient}
+          currentTime={currentTime}
+          duration={duration}
+          isPlaying={isPlaying}
+          lyricsLabel={t.lyricsBtn}
+          onSeek={onSeek}
+          onClose={() => setShowLyrics(false)}
+        />
       )}
 
       {/* Track Metadata + Scrubber + Transport */}
