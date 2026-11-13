@@ -4,6 +4,7 @@ export interface TranslationStrings {
   brand: string;
   tabListen: string;
   tabChart: string;
+  tabKaynar: string;
   tabOffline: string;
   tabUpload: string;
   tabSettings: string;
@@ -84,6 +85,7 @@ export const translations: Record<Language, TranslationStrings> = {
     brand: 'Қазақша Мадақ',
     tabListen: 'Тыңдау',
     tabChart: 'Чарт',
+    tabKaynar: 'Бақыт қайнар',
     tabOffline: 'Офлайн',
     tabUpload: 'Жүктеу',
     tabSettings: 'Баптау',
@@ -162,6 +164,7 @@ export const translations: Record<Language, TranslationStrings> = {
     brand: '카자흐 찬양',
     tabListen: '지금 듣기',
     tabChart: '인기 차트',
+    tabKaynar: 'Бақыт қайнар',
     tabOffline: '보관함',
     tabUpload: '업로드',
     tabSettings: '설정',
@@ -240,6 +243,7 @@ export const translations: Record<Language, TranslationStrings> = {
     brand: 'Kazakh Worship',
     tabListen: 'Listen Now',
     tabChart: 'Charts',
+    tabKaynar: 'Бақыт қайнар',
     tabOffline: 'Offline',
     tabUpload: 'Upload',
     tabSettings: 'Settings',
@@ -318,6 +322,7 @@ export const translations: Record<Language, TranslationStrings> = {
     brand: 'Казахские Песни',
     tabListen: 'Слушать',
     tabChart: 'Чарт',
+    tabKaynar: 'Бақыт қайнар',
     tabOffline: 'Офлайн',
     tabUpload: 'Загрузить',
     tabSettings: 'Настройки',

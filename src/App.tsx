@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import {
+  BookOpen,
   CloudUpload,
   Download,
   Info,
@@ -11,6 +12,7 @@ import {
   Shuffle,
   Trophy,
 } from 'lucide-react';
+import { BakhytKaynarView } from './components/BakhytKaynarView';
 import { FullPlayerSheet } from './components/FullPlayerSheet';
 import { InstallPromptBanner } from './components/InstallPromptBanner';
 import { MiniPlayer } from './components/MiniPlayer';
@@ -191,6 +193,8 @@ export function App() {
       ? t.tabListen
       : tab === 'chart'
       ? t.tabChart
+      : tab === 'kaynar'
+      ? t.tabKaynar
       : tab === 'offline'
       ? t.tabOffline
       : tab === 'upload'
@@ -249,7 +253,7 @@ export function App() {
         {/* Main Scrollable Area */}
         <main className="flex-1 px-5 pt-3 pb-40 space-y-4">
           {/* Search Bar */}
-          {(tab === 'listen' || tab === 'chart' || tab === 'offline') && (
+          {(tab === 'listen' || tab === 'chart' || tab === 'kaynar' || tab === 'offline') && (
             <div className="relative">
               <Search className="w-3.5 h-3.5 text-[#86868B] absolute left-3.5 top-3" />
               <input
@@ -392,6 +396,18 @@ export function App() {
             </div>
           )}
 
+          {/* TAB 2.5: БАҚЫТ ҚАЙНАР (13 SONGS + LYRIC DECK) */}
+          {tab === 'kaynar' && (
+            <BakhytKaynarView
+              lang={lang}
+              search={search}
+              songs={publishedSongs}
+              currentSong={player.currentSong}
+              isPlaying={player.isPlaying}
+              onPlaySong={(song) => void player.playSong(song)}
+            />
+          )}
+
           {/* TAB 3: OFFLINE & LIBRARY */}
           {tab === 'offline' && (
             <div className="space-y-5">
@@ -511,11 +527,12 @@ export function App() {
         )}
 
         {/* Bottom Mobile Tab Bar */}
-        <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] h-[56px] bg-white/95 backdrop-blur-xl border-t border-black/[0.06] z-30 grid grid-cols-5 px-1">
+        <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] h-[56px] bg-white/95 backdrop-blur-xl border-t border-black/[0.06] z-30 grid grid-cols-6 px-0.5">
           {(
             [
               { id: 'listen', icon: Music, label: t.tabListen },
               { id: 'chart', icon: Trophy, label: t.tabChart },
+              { id: 'kaynar', icon: BookOpen, label: t.tabKaynar },
               { id: 'offline', icon: Download, label: t.tabOffline },
               { id: 'upload', icon: CloudUpload, label: t.tabUpload },
               { id: 'settings', icon: Settings, label: t.tabSettings },
@@ -527,12 +544,16 @@ export function App() {
                 key={id}
                 type="button"
                 onClick={() => setTab(id)}
-                className={`flex flex-col items-center justify-center gap-0.5 ${
+                className={`flex flex-col items-center justify-center gap-0.5 min-w-0 px-0.5 ${
                   active ? 'text-[#FA243C]' : 'text-[#86868B]'
                 }`}
               >
-                <Icon className="w-4 h-4" />
-                <span className={`text-[11px] leading-none ${active ? 'font-bold' : 'font-medium'}`}>
+                <Icon className="w-4 h-4 shrink-0" />
+                <span
+                  className={`text-[10px] leading-none truncate max-w-full ${
+                    active ? 'font-bold' : 'font-medium'
+                  }`}
+                >
                   {label}
                 </span>
               </button>

@@ -2,7 +2,7 @@ export type Language = 'kk' | 'ko' | 'en' | 'ru';
 
 export type RepeatMode = 'off' | 'all' | 'one';
 
-export type TabId = 'listen' | 'chart' | 'offline' | 'upload' | 'settings';
+export type TabId = 'listen' | 'chart' | 'kaynar' | 'offline' | 'upload' | 'settings';
 
 export type SongStatus = 'published' | 'pending' | 'removed';
 
