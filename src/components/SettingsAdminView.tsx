@@ -50,12 +50,19 @@ export function SettingsAdminView({
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [reports, setReports] = useState<SongReport[]>([]);
   const [dombraTapCount, setDombraTapCount] = useState(0);
-  const [devSettingsOpen, setDevSettingsOpen] = useState(false);
+  const [devSettingsOpen, setDevSettingsOpen] = useState(
+    () => sessionStorage.getItem('kwp_dev_mode') === 'true'
+  );
+
+  const setDevOpen = (next: boolean) => {
+    setDevSettingsOpen(next);
+    sessionStorage.setItem('kwp_dev_mode', String(next));
+  };
 
   const handleDombraTap = () => {
     const next = dombraTapCount + 1;
     if (next >= 5) {
-      setDevSettingsOpen((prev) => !prev);
+      setDevOpen(!devSettingsOpen);
       setDombraTapCount(0);
     } else {
       setDombraTapCount(next);
@@ -131,21 +138,23 @@ export function SettingsAdminView({
           <ChevronRight className="w-4 h-4 text-[#86868B] shrink-0" />
         </button>
 
-        <button
-          type="button"
-          onClick={() => onNavigateTab('upload')}
-          className="w-full px-4 py-3 flex items-center justify-between text-left active:bg-black/5 transition"
-        >
-          <div className="flex items-center gap-3 min-w-0">
-            <span className="w-8 h-8 rounded-xl bg-[#007AFF]/12 text-[#007AFF] flex items-center justify-center shrink-0">
-              <CloudUpload className="w-4 h-4" />
-            </span>
-            <div className="min-w-0">
-              <p className="text-xs font-bold text-[#1D1D1F]">{t.tabUpload}</p>
+        {devSettingsOpen && (
+          <button
+            type="button"
+            onClick={() => onNavigateTab('upload')}
+            className="w-full px-4 py-3 flex items-center justify-between text-left active:bg-black/5 transition"
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              <span className="w-8 h-8 rounded-xl bg-[#007AFF]/12 text-[#007AFF] flex items-center justify-center shrink-0">
+                <CloudUpload className="w-4 h-4" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-[#1D1D1F]">{t.tabUpload}</p>
+              </div>
             </div>
-          </div>
-          <ChevronRight className="w-4 h-4 text-[#86868B] shrink-0" />
-        </button>
+            <ChevronRight className="w-4 h-4 text-[#86868B] shrink-0" />
+          </button>
+        )}
       </div>
 
       {/* Weekly Chart Reset Control */}
@@ -209,7 +218,7 @@ export function SettingsAdminView({
             </h3>
             <button
               type="button"
-              onClick={() => setDevSettingsOpen(false)}
+              onClick={() => setDevOpen(false)}
               className="text-[11px] text-white/60 hover:text-white"
             >
               Hide
@@ -288,21 +297,22 @@ export function SettingsAdminView({
         )}
       </div>
 
-      {/* Admin Login / Admin Panel */}
-      <div className="bg-[#F5F5F7] rounded-2xl p-4 space-y-3">
-        <div className="flex items-center justify-between">
-          <h3 className="text-xs font-extrabold text-[#1D1D1F] flex items-center gap-1.5">
-            <ShieldCheck className="w-4 h-4 text-[#FA243C]" />
-            <span>{t.adminSectionTitle}</span>
-          </h3>
-          {session && (
-            <button
-              type="button"
-              onClick={() => void handleLogout()}
-              className="text-xs font-semibold text-[#FA243C] flex items-center gap-1"
-            >
-              <LogOut className="w-3.5 h-3.5" />
-              <span>{t.adminLogoutBtn}</span>
+      {/* Admin Login / Admin Panel (Shown only when Dev Mode is ON) */}
+      {devSettingsOpen && (
+        <div className="bg-[#F5F5F7] rounded-2xl p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xs font-extrabold text-[#1D1D1F] flex items-center gap-1.5">
+              <ShieldCheck className="w-4 h-4 text-[#FA243C]" />
+              <span>{t.adminSectionTitle}</span>
+            </h3>
+            {session && (
+              <button
+                type="button"
+                onClick={() => void handleLogout()}
+                className="text-xs font-semibold text-[#FA243C] flex items-center gap-1"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span>{t.adminLogoutBtn}</span>
             </button>
           )}
         </div>
@@ -438,7 +448,8 @@ export function SettingsAdminView({
             </div>
           </div>
         )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
