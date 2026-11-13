@@ -56,7 +56,7 @@ export function SongRow({
       >
         {typeof rank === 'number' && (
           <span
-            className={`w-5 text-center text-xs font-extrabold shrink-0 ${
+            className={`w-6 text-center text-xs font-extrabold tabular-nums shrink-0 ${
               rank <= 3 ? 'text-[#FA243C]' : 'text-[#86868B]'
             }`}
           >

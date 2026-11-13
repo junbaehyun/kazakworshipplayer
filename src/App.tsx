@@ -167,21 +167,27 @@ export function App() {
     await refreshOfflineStats();
   };
 
+  const topChartSongs = useMemo(
+    () => [...publishedSongs].sort((a, b) => b.play_count - a.play_count),
+    [publishedSongs]
+  );
+
+  const songRankMap = useMemo(() => {
+    const map = new Map<string, number>();
+    topChartSongs.forEach((s, idx) => map.set(s.id, idx + 1));
+    return map;
+  }, [topChartSongs]);
+
   const filteredSongs = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return publishedSongs;
-    return publishedSongs.filter(
+    if (!q) return topChartSongs;
+    return topChartSongs.filter(
       (s) =>
         s.title.toLowerCase().includes(q) ||
         s.artist.toLowerCase().includes(q) ||
         (s.lyrics && s.lyrics.toLowerCase().includes(q))
     );
-  }, [publishedSongs, search]);
-
-  const topChartSongs = useMemo(
-    () => [...publishedSongs].sort((a, b) => b.play_count - a.play_count),
-    [publishedSongs]
-  );
+  }, [topChartSongs, search]);
 
   const offlineSongs = useMemo(
     () => filteredSongs.filter((s) => offlineIds.includes(s.id)),
@@ -339,10 +345,11 @@ export function App() {
                   <p className="text-xs text-[#86868B] text-center py-8">{t.noSongsFound}</p>
                 ) : (
                   <div className="divide-y divide-black/[0.06]">
-                    {filteredSongs.map((s) => (
+                    {filteredSongs.map((s, idx) => (
                       <SongRow
                         key={s.id}
                         song={s}
+                        rank={songRankMap.get(s.id) ?? idx + 1}
                         isCurrent={player.currentSong?.id === s.id}
                         isPlaying={player.isPlaying}
                         isOffline={offlineIds.includes(s.id)}
@@ -377,7 +384,7 @@ export function App() {
                   <SongRow
                     key={s.id}
                     song={s}
-                    rank={idx + 1}
+                    rank={songRankMap.get(s.id) ?? idx + 1}
                     isCurrent={player.currentSong?.id === s.id}
                     isPlaying={player.isPlaying}
                     isOffline={offlineIds.includes(s.id)}
