@@ -1,16 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import {
+  ArrowLeft,
   BookOpen,
-  CloudUpload,
-  Download,
   Info,
   Music,
   Play,
   Search,
   Settings,
   Shuffle,
-  Trophy,
 } from 'lucide-react';
 import { BakhytKaynarView } from './components/BakhytKaynarView';
 import { FullPlayerSheet } from './components/FullPlayerSheet';
@@ -24,8 +22,10 @@ import { useAudioPlayer } from './hooks/useAudioPlayer';
 import { translations } from './i18n/translations';
 import {
   clearAllOfflineBlobs,
+  getWeeklyChartInfo,
   listOfflineIds,
   removeOfflineBlob,
+  resetWeeklyChartPlays,
 } from './lib/localDb';
 import { fetchAndCacheAudioBlob, fetchSongs, getAdminSession, supabase } from './lib/supabase';
 import type { Language, Song, TabId } from './types';
@@ -165,6 +165,11 @@ export function App() {
   const handleClearOffline = async () => {
     await clearAllOfflineBlobs();
     await refreshOfflineStats();
+  };
+
+  const handleResetWeeklyChart = () => {
+    const reset = resetWeeklyChartPlays();
+    setSongs(reset);
   };
 
   const topChartSongs = useMemo(
@@ -371,35 +376,50 @@ export function App() {
             </>
           )}
 
-          {/* TAB 2: TOP CHART */}
+          {/* TAB 2: TOP CHART (Opened from Settings) */}
           {tab === 'chart' && (
-            <div className="divide-y divide-black/[0.06]">
-              {topChartSongs
-                .filter((s) =>
-                  search.trim()
-                    ? s.title.toLowerCase().includes(search.toLowerCase())
-                    : true
-                )
-                .map((s, idx) => (
-                  <SongRow
-                    key={s.id}
-                    song={s}
-                    rank={songRankMap.get(s.id) ?? idx + 1}
-                    isCurrent={player.currentSong?.id === s.id}
-                    isPlaying={player.isPlaying}
-                    isOffline={offlineIds.includes(s.id)}
-                    isSavingOffline={savingOfflineId === s.id}
-                    isInPlaylist={playlistIds.includes(s.id)}
-                    t={t}
-                    onPlay={(song) => void player.playSong(song)}
-                    onToggleOffline={(song) => void handleToggleOffline(song)}
-                    onTogglePlaylist={handleTogglePlaylist}
-                    onOpenReport={(song) => {
-                      setReportTargetSong(song);
-                      setNoticeOpen(true);
-                    }}
-                  />
-                ))}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <button
+                  type="button"
+                  onClick={() => setTab('settings')}
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#FA243C] active:opacity-70"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  <span>{t.tabSettings}</span>
+                </button>
+                <span className="text-[11px] text-[#86868B]">
+                  7d reset · {new Date(getWeeklyChartInfo().nextResetAt).toLocaleDateString()}
+                </span>
+              </div>
+              <div className="divide-y divide-black/[0.06]">
+                {topChartSongs
+                  .filter((s) =>
+                    search.trim()
+                      ? s.title.toLowerCase().includes(search.toLowerCase())
+                      : true
+                  )
+                  .map((s, idx) => (
+                    <SongRow
+                      key={s.id}
+                      song={s}
+                      rank={songRankMap.get(s.id) ?? idx + 1}
+                      isCurrent={player.currentSong?.id === s.id}
+                      isPlaying={player.isPlaying}
+                      isOffline={offlineIds.includes(s.id)}
+                      isSavingOffline={savingOfflineId === s.id}
+                      isInPlaylist={playlistIds.includes(s.id)}
+                      t={t}
+                      onPlay={(song) => void player.playSong(song)}
+                      onToggleOffline={(song) => void handleToggleOffline(song)}
+                      onTogglePlaylist={handleTogglePlaylist}
+                      onOpenReport={(song) => {
+                        setReportTargetSong(song);
+                        setNoticeOpen(true);
+                      }}
+                    />
+                  ))}
+              </div>
             </div>
           )}
 
@@ -415,9 +435,17 @@ export function App() {
             />
           )}
 
-          {/* TAB 3: OFFLINE & LIBRARY */}
+          {/* TAB 3: OFFLINE & LIBRARY (Opened from Settings) */}
           {tab === 'offline' && (
             <div className="space-y-5">
+              <button
+                type="button"
+                onClick={() => setTab('settings')}
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#FA243C] active:opacity-70"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span>{t.tabSettings}</span>
+              </button>
               {/* My Playlist */}
               <section className="space-y-2">
                 <div className="bg-[#F5F5F7] rounded-2xl p-3 flex items-center justify-between">
@@ -487,16 +515,26 @@ export function App() {
             </div>
           )}
 
-          {/* TAB 4: UPLOAD */}
+          {/* TAB 4: UPLOAD (Opened from Settings) */}
           {tab === 'upload' && (
-            <UploadView
-              t={t}
-              isAdmin={Boolean(session)}
-              onUploaded={(newSong) => {
-                setSongs((prev) => [newSong, ...prev]);
-                void refreshOfflineStats();
-              }}
-            />
+            <div className="space-y-3">
+              <button
+                type="button"
+                onClick={() => setTab('settings')}
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#FA243C] active:opacity-70"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span>{t.tabSettings}</span>
+              </button>
+              <UploadView
+                t={t}
+                isAdmin={Boolean(session)}
+                onUploaded={(newSong) => {
+                  setSongs((prev) => [newSong, ...prev]);
+                  void refreshOfflineStats();
+                }}
+              />
+            </div>
           )}
 
           {/* TAB 5: SETTINGS & ADMIN */}
@@ -514,6 +552,8 @@ export function App() {
                 setReportTargetSong(null);
                 setNoticeOpen(true);
               }}
+              onNavigateTab={(nextTab) => setTab(nextTab)}
+              onResetWeeklyChart={handleResetWeeklyChart}
             />
           )}
         </main>
@@ -533,19 +573,18 @@ export function App() {
           />
         )}
 
-        {/* Bottom Mobile Tab Bar */}
-        <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] h-[56px] bg-white/95 backdrop-blur-xl border-t border-black/[0.06] z-30 grid grid-cols-6 px-0.5">
+        {/* Bottom Mobile Tab Bar (3 Primary Tabs; Chart/Offline/Upload live in Settings) */}
+        <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] h-[56px] bg-white/95 backdrop-blur-xl border-t border-black/[0.06] z-30 grid grid-cols-3 px-1">
           {(
             [
               { id: 'listen', icon: Music, label: t.tabListen },
-              { id: 'chart', icon: Trophy, label: t.tabChart },
               { id: 'kaynar', icon: BookOpen, label: t.tabKaynar },
-              { id: 'offline', icon: Download, label: t.tabOffline },
-              { id: 'upload', icon: CloudUpload, label: t.tabUpload },
               { id: 'settings', icon: Settings, label: t.tabSettings },
             ] as const
           ).map(({ id, icon: Icon, label }) => {
-            const active = tab === id;
+            const active =
+              tab === id ||
+              (id === 'settings' && (tab === 'chart' || tab === 'offline' || tab === 'upload'));
             return (
               <button
                 key={id}

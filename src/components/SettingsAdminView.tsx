@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { Check, HardDrive, LogOut, Mail, ShieldCheck, Trash2 } from 'lucide-react';
+import { Check, ChevronRight, CloudUpload, Download, HardDrive, LogOut, Mail, RotateCcw, ShieldCheck, Trash2, Trophy } from 'lucide-react';
 import type { Session } from '@supabase/supabase-js';
 import type { TranslationStrings } from '../i18n/translations';
 import {
@@ -10,6 +10,7 @@ import {
   signInAdmin,
   signOutAdmin,
 } from '../lib/supabase';
+import { getWeeklyChartInfo } from '../lib/localDb';
 import type { Song, SongReport } from '../types';
 
 interface SettingsAdminViewProps {
@@ -22,6 +23,8 @@ interface SettingsAdminViewProps {
   onSessionChange: (session: Session | null) => void;
   onRefreshSongs: () => Promise<void>;
   onOpenNotice: () => void;
+  onNavigateTab: (tab: 'chart' | 'offline' | 'upload') => void;
+  onResetWeeklyChart: () => void;
 }
 
 export function SettingsAdminView({
@@ -34,6 +37,8 @@ export function SettingsAdminView({
   onSessionChange,
   onRefreshSongs,
   onOpenNotice,
+  onNavigateTab,
+  onResetWeeklyChart,
 }: SettingsAdminViewProps) {
   const [email, setEmail] = useState('junbaehyun.kz@gmail.com');
   const [password, setPassword] = useState('');
@@ -69,9 +74,80 @@ export function SettingsAdminView({
 
   const pendingSongs = songs.filter((s) => s.status === 'pending');
   const sizeMb = (offlineBytes / (1024 * 1024)).toFixed(1);
+  const { nextResetAt } = getWeeklyChartInfo();
+  const nextResetLabel = new Date(nextResetAt).toLocaleDateString();
 
   return (
     <div className="space-y-4">
+      {/* Navigation Shortcuts (Chart, Offline Library, Upload) */}
+      <div className="bg-[#F5F5F7] rounded-2xl divide-y divide-black/[0.06] overflow-hidden">
+        <button
+          type="button"
+          onClick={() => onNavigateTab('chart')}
+          className="w-full px-4 py-3 flex items-center justify-between text-left active:bg-black/5 transition"
+        >
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="w-8 h-8 rounded-xl bg-[#FA243C]/12 text-[#FA243C] flex items-center justify-center shrink-0">
+              <Trophy className="w-4 h-4" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-xs font-bold text-[#1D1D1F]">{t.tabChart}</p>
+              <p className="text-[11px] text-[#86868B] truncate">7d reset · {nextResetLabel}</p>
+            </div>
+          </div>
+          <ChevronRight className="w-4 h-4 text-[#86868B] shrink-0" />
+        </button>
+
+        <button
+          type="button"
+          onClick={() => onNavigateTab('offline')}
+          className="w-full px-4 py-3 flex items-center justify-between text-left active:bg-black/5 transition"
+        >
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="w-8 h-8 rounded-xl bg-[#34C759]/12 text-[#34C759] flex items-center justify-center shrink-0">
+              <Download className="w-4 h-4" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-xs font-bold text-[#1D1D1F]">{t.tabOffline}</p>
+              <p className="text-[11px] text-[#86868B]">{offlineCount} MP3 · {sizeMb} MB</p>
+            </div>
+          </div>
+          <ChevronRight className="w-4 h-4 text-[#86868B] shrink-0" />
+        </button>
+
+        <button
+          type="button"
+          onClick={() => onNavigateTab('upload')}
+          className="w-full px-4 py-3 flex items-center justify-between text-left active:bg-black/5 transition"
+        >
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="w-8 h-8 rounded-xl bg-[#007AFF]/12 text-[#007AFF] flex items-center justify-center shrink-0">
+              <CloudUpload className="w-4 h-4" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-xs font-bold text-[#1D1D1F]">{t.tabUpload}</p>
+            </div>
+          </div>
+          <ChevronRight className="w-4 h-4 text-[#86868B] shrink-0" />
+        </button>
+      </div>
+
+      {/* Weekly Chart Reset Control */}
+      <div className="bg-[#F5F5F7] rounded-2xl p-4 flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-xs font-bold text-[#1D1D1F]">{t.tabChart} (7d)</p>
+          <p className="text-[11px] text-[#86868B]">Next auto-refresh: {nextResetLabel}</p>
+        </div>
+        <button
+          type="button"
+          onClick={onResetWeeklyChart}
+          className="px-3 py-1.5 rounded-xl bg-white border border-black/[0.06] text-xs font-semibold text-[#FA243C] flex items-center gap-1.5 shrink-0 active:bg-black/5"
+        >
+          <RotateCcw className="w-3.5 h-3.5" />
+          <span>Reset</span>
+        </button>
+      </div>
+
       {/* Copyright & Contact Card */}
       <div className="bg-[#FFF8F6] border border-[#FA243C]/15 rounded-2xl p-4 space-y-2">
         <div className="flex items-center justify-between">
