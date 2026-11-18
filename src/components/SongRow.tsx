@@ -49,7 +49,10 @@ export function SongRow({
   const gradient = getSongGradient(song.id);
 
   return (
-    <div className="py-2.5 flex items-center justify-between gap-2.5">
+    <div
+      className="py-2.5 flex items-center justify-between gap-2.5"
+      style={{ contentVisibility: 'auto', containIntrinsicSize: '0 64px' }}
+    >
       <button
         type="button"
         onClick={() => onPlay(song)}
