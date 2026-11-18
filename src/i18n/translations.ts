@@ -87,6 +87,8 @@ export interface TranslationStrings {
   authSignInBtn: string;
   authSignUpBtn: string;
   authCheckEmailMsg: string;
+  authGoogleBtn: string;
+  authOrDivider: string;
   authAccountTitle: string;
   authSignOutBtn: string;
 }
@@ -179,6 +181,8 @@ export const translations: Record<Language, TranslationStrings> = {
     authSignInBtn: 'Кіру',
     authSignUpBtn: 'Тіркелгі жасау',
     authCheckEmailMsg: 'Растау хаты поштаңызға жіберілді. Поштаңызды растап, кіріңіз.',
+    authGoogleBtn: 'Google арқылы кіру',
+    authOrDivider: 'немесе',
     authAccountTitle: 'Тіркелгі',
     authSignOutBtn: 'Шығу'
   },
@@ -269,6 +273,8 @@ export const translations: Record<Language, TranslationStrings> = {
     authSignInBtn: '로그인',
     authSignUpBtn: '회원가입',
     authCheckEmailMsg: '인증 메일을 보냈습니다. 이메일 인증 후 로그인해주세요.',
+    authGoogleBtn: 'Google로 계속하기',
+    authOrDivider: '또는',
     authAccountTitle: '계정',
     authSignOutBtn: '로그아웃'
   },
@@ -359,6 +365,8 @@ export const translations: Record<Language, TranslationStrings> = {
     authSignInBtn: 'Sign In',
     authSignUpBtn: 'Create Account',
     authCheckEmailMsg: 'Confirmation email sent. Please check your inbox and then sign in.',
+    authGoogleBtn: 'Continue with Google',
+    authOrDivider: 'or',
     authAccountTitle: 'Account',
     authSignOutBtn: 'Sign Out'
   },
@@ -449,6 +457,8 @@ export const translations: Record<Language, TranslationStrings> = {
     authSignInBtn: 'Войти',
     authSignUpBtn: 'Создать аккаунт',
     authCheckEmailMsg: 'Письмо с подтверждением отправлено на вашу почту. Подтвердите email и войдите.',
+    authGoogleBtn: 'Войти через Google',
+    authOrDivider: 'или',
     authAccountTitle: 'Аккаунт',
     authSignOutBtn: 'Выйти'
   }

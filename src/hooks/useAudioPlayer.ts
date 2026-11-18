@@ -4,6 +4,7 @@ import { incrementSongPlay, resolveAudioSource } from '../lib/supabase';
 
 interface UseAudioPlayerOptions {
   songs: Song[];
+  offlineIds?: string[];
   onPlayCountUpdated: (songId: string, newCount: number) => void;
   onBeforePlay?: (song: Song) => boolean;
   onSongEnded?: (song: Song) => boolean | void;
@@ -22,6 +23,7 @@ function buildShuffledIds(songs: Song[], excludeId?: string): string[] {
 
 export function useAudioPlayer({
   songs,
+  offlineIds = [],
   onPlayCountUpdated,
   onBeforePlay,
   onSongEnded,
@@ -33,6 +35,9 @@ export function useAudioPlayer({
   const shuffleQueueRef = useRef<string[]>([]);
   const shuffleHistoryRef = useRef<string[]>([]);
   const skipHistoryPushRef = useRef<boolean>(false);
+  const offlineIdsRef = useRef<Set<string>>(new Set(offlineIds));
+  offlineIdsRef.current = new Set(offlineIds);
+  const consecutiveErrorsRef = useRef<number>(0);
 
   const [currentSong, setCurrentSong] = useState<Song | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -46,16 +51,24 @@ export function useAudioPlayer({
     return localStorage.getItem('kwp_shuffle') === 'true';
   });
 
-  // Ensure singleton <audio> element exists
+  // Ensure singleton <audio> element exists and stays attached to document.body for mobile background playback
   useEffect(() => {
     if (!audioRef.current) {
-      const audio = new Audio();
+      const audio = document.createElement('audio');
       audio.preload = 'auto';
+      audio.setAttribute('playsinline', 'true');
+      audio.style.display = 'none';
+      document.body.appendChild(audio);
       audioRef.current = audio;
     }
     return () => {
       if (objectUrlRef.current) {
         URL.revokeObjectURL(objectUrlRef.current);
+      }
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.remove();
+        audioRef.current = null;
       }
     };
   }, []);
@@ -106,11 +119,33 @@ export function useAudioPlayer({
       }
       shuffleQueueRef.current = shuffleQueueRef.current.filter((id) => id !== song.id);
 
-      const { src, isObjectUrl } = await resolveAudioSource(song);
-      if (isObjectUrl) objectUrlRef.current = src;
-
       playTrackedForIdRef.current = null;
       listenedSecondsRef.current = 0;
+
+      if ('mediaSession' in navigator) {
+        navigator.mediaSession.metadata = new MediaMetadata({
+          title: song.title,
+          artist: song.is_unknown_author ? 'Белгісіз автор' : song.artist,
+          album: 'Қазақша Мадақ Әндері',
+        });
+      }
+
+      const needsAsyncResolve =
+        offlineIdsRef.current.has(song.id) ||
+        song.id.startsWith('demo-') ||
+        song.audio_url.startsWith('gdrive://');
+
+      let src = song.audio_url;
+      if (needsAsyncResolve) {
+        try {
+          const resolved = await resolveAudioSource(song);
+          src = resolved.src;
+          if (resolved.isObjectUrl) objectUrlRef.current = resolved.src;
+        } catch (err) {
+          console.warn('Failed to resolve offline/remote source, falling back to URL:', err);
+          src = song.audio_url;
+        }
+      }
 
       audio.src = src;
       setCurrentSong(song);
@@ -122,14 +157,6 @@ export function useAudioPlayer({
       } catch (e) {
         console.warn('Audio play interrupted:', e);
         setIsPlaying(false);
-      }
-
-      if ('mediaSession' in navigator) {
-        navigator.mediaSession.metadata = new MediaMetadata({
-          title: song.title,
-          artist: song.is_unknown_author ? 'Белгісіз автор' : song.artist,
-          album: 'Қазақша Мадақ Әндері',
-        });
       }
     },
     [currentSong, onBeforePlay]
@@ -270,7 +297,23 @@ export function useAudioPlayer({
       }
     };
 
-    const onLoadedMetadata = () => setDuration(audio.duration || 0);
+    const onLoadedMetadata = () => {
+      const nextDuration = audio.duration || 0;
+      setDuration(nextDuration);
+      if ('mediaSession' in navigator && typeof navigator.mediaSession.setPositionState === 'function') {
+        if (Number.isFinite(nextDuration) && nextDuration > 0) {
+          try {
+            navigator.mediaSession.setPositionState({
+              duration: nextDuration,
+              playbackRate: audio.playbackRate || 1,
+              position: Math.min(audio.currentTime || 0, nextDuration),
+            });
+          } catch {
+            // Ignore position state errors on unsupported browsers
+          }
+        }
+      }
+    };
     const onEnded = () => {
       if (currentSong && onSongEnded?.(currentSong) === true) {
         setIsPlaying(false);
@@ -278,14 +321,35 @@ export function useAudioPlayer({
       }
       playNext(true);
     };
-    const onPlay = () => setIsPlaying(true);
-    const onPause = () => setIsPlaying(false);
+    const onPlay = () => {
+      setIsPlaying(true);
+      consecutiveErrorsRef.current = 0;
+      if ('mediaSession' in navigator) {
+        navigator.mediaSession.playbackState = 'playing';
+      }
+    };
+    const onPause = () => {
+      setIsPlaying(false);
+      if ('mediaSession' in navigator) {
+        navigator.mediaSession.playbackState = 'paused';
+      }
+    };
+    const onError = () => {
+      console.warn('Audio element error on track:', currentSong?.id);
+      if (songs.length > 1 && consecutiveErrorsRef.current < Math.min(songs.length, 5)) {
+        consecutiveErrorsRef.current += 1;
+        playNext(true);
+      } else {
+        setIsPlaying(false);
+      }
+    };
 
     audio.addEventListener('timeupdate', onTimeUpdate);
     audio.addEventListener('loadedmetadata', onLoadedMetadata);
     audio.addEventListener('ended', onEnded);
     audio.addEventListener('play', onPlay);
     audio.addEventListener('pause', onPause);
+    audio.addEventListener('error', onError);
 
     return () => {
       audio.removeEventListener('timeupdate', onTimeUpdate);
@@ -293,8 +357,9 @@ export function useAudioPlayer({
       audio.removeEventListener('ended', onEnded);
       audio.removeEventListener('play', onPlay);
       audio.removeEventListener('pause', onPause);
+      audio.removeEventListener('error', onError);
     };
-  }, [currentSong, onSongEnded, playNext, triggerPlayIncrement]);
+  }, [currentSong, onSongEnded, playNext, songs.length, triggerPlayIncrement]);
 
   // Wire MediaSession Lock-Screen Controls
   useEffect(() => {

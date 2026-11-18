@@ -3,7 +3,7 @@ import type { Song, SongReport } from '../types';
 const DB_NAME = 'kwp_offline_db';
 const DB_VERSION = 1;
 const BLOB_STORE = 'offline_blobs';
-const SONGS_KEY = 'kwp_local_songs_v42';
+const SONGS_KEY = 'kwp_local_songs_v43';
 const WEEKLY_RESET_KEY = 'kwp_weekly_chart_reset_at';
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 const REPORTS_KEY = 'kwp_local_reports_v1';
@@ -700,7 +700,7 @@ const DEFAULT_LOCAL_SONGS: Song[] = [
     artist: 'Мартин Смит',
     is_unknown_author: false,
     permission_note: 'Top #29 Kazakh worship (#5769 · worshipleaderapp.com)',
-    audio_url: 'https://repo.worshipleaderapp.com/mp3/M_n_gilik%20madak_taimyn%20Seni.mp3',
+    audio_url: '/audio/manggilik-madaqtaymyn-seni.mp3',
     storage_path: null,
     duration_seconds: 163,
     lyrics:
@@ -713,7 +713,7 @@ const DEFAULT_LOCAL_SONGS: Song[] = [
   },
   {
     id: 'song-5804',
-    title: 'Алғыс Саған, жалғыз Саған',
+    title: 'Алғыс Саған, жалғыз Саған (Тәңір, маған сөйледің Сен)',
     artist: 'Белгісіз автор',
     is_unknown_author: true,
     permission_note: 'Top #30 Kazakh worship (#5804 · worshipleaderapp.com)',
@@ -1665,7 +1665,7 @@ const DEFAULT_LOCAL_SONGS: Song[] = [
   },
   {
     id: 'song-99411',
-    title: 'Біздің Құдай',
+    title: 'Біздің Құдай (Судан шарап жасадың)',
     artist: 'Matt Redman (Қазақша аударма)',
     is_unknown_author: false,
     permission_note: 'Top #105 Kazakh worship (#99411 · worshipleaderapp.com)',
@@ -2048,23 +2048,6 @@ const DEFAULT_LOCAL_SONGS: Song[] = [
     duration_seconds: 217,
     lyrics:
       'Шақыр мені, естимін,\nШақыр, мен барамын.\nСоңыңнан, Құдай,\nЖеттім не жерде.\n\nЖүрегімдесің менің,\nСен жақтың отында.\nҚұдайым, Сенің\nІзіңмен жүрем.\n\nЖетелеші мені,\nҚұдайым, боламын бірге!\nСен бар жерлерде,\nСені сондай сүйем!',
-    play_count: 0,
-    uploaded_by: 'developer',
-    status: 'published',
-    is_active: true,
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: 'song-manggilik-madaqtaymyn-seni',
-    title: 'Мәңгілік мадақтаймын Сені',
-    artist: 'Белгісіз автор',
-    is_unknown_author: true,
-    permission_note: 'Permitted for community worship sharing',
-    audio_url: '/audio/manggilik-madaqtaymyn-seni.mp3',
-    storage_path: null,
-    duration_seconds: 163,
-    lyrics:
-      'Шаттық тыныштық сыйлаған,\nМахаббатың төгіледі.\n\nМәңгілік мадақтаймын Сені,\nМәңгілік ардақтаймын Сені!\n\nБүкіл әлем жарық көрсе,\nОлар да билер бізбен бірге.',
     play_count: 0,
     uploaded_by: 'developer',
     status: 'published',

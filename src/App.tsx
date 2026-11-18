@@ -76,6 +76,7 @@ export function App() {
   });
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const pendingSongRef = useRef<Song | null>(null);
+  const pendingPromptOnVisibleRef = useRef(false);
   const [showKaynarTab, setShowKaynarTab] = useState<boolean>(() => {
     return localStorage.getItem(DEV_KAYNAR_KEY) !== 'false';
   });
@@ -171,7 +172,12 @@ export function App() {
     return playlistIds.map((id) => byId.get(id)).filter((s): s is Song => Boolean(s));
   }, [publishedSongs, playlistIds]);
 
-  const libraryQueue = useMemo(() => publishedSongs, [publishedSongs]);
+  const topChartSongs = useMemo(
+    () => [...publishedSongs].sort((a, b) => b.play_count - a.play_count),
+    [publishedSongs]
+  );
+
+  const libraryQueue = useMemo(() => topChartSongs, [topChartSongs]);
 
   const handleBeforePlay = useCallback(
     (song: Song) => {
@@ -189,14 +195,34 @@ export function App() {
     if (!isAuthenticatedRef.current) {
       setGuestSongDone(true);
       localStorage.setItem('kwp_guest_song_done', 'true');
+      if (document.visibilityState === 'hidden') {
+        pendingPromptOnVisibleRef.current = true;
+        return false;
+      }
       setIsAuthModalOpen(true);
       return true;
     }
     return false;
   }, []);
 
+  useEffect(() => {
+    const onVisibilityChange = () => {
+      if (
+        document.visibilityState === 'visible' &&
+        pendingPromptOnVisibleRef.current &&
+        !isAuthenticatedRef.current
+      ) {
+        pendingPromptOnVisibleRef.current = false;
+        setIsAuthModalOpen(true);
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', onVisibilityChange);
+  }, []);
+
   const player = useAudioPlayer({
     songs: libraryQueue,
+    offlineIds,
     onPlayCountUpdated: handlePlayCountUpdated,
     onBeforePlay: handleBeforePlay,
     onSongEnded: handleSongEnded,
@@ -235,11 +261,6 @@ export function App() {
     const reset = resetWeeklyChartPlays();
     setSongs(reset);
   };
-
-  const topChartSongs = useMemo(
-    () => [...publishedSongs].sort((a, b) => b.play_count - a.play_count),
-    [publishedSongs]
-  );
 
   const songRankMap = useMemo(() => {
     const map = new Map<string, number>();

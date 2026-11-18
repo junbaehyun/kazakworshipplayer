@@ -333,6 +333,17 @@ export async function signUpUser(
   };
 }
 
+export async function signInWithGoogle(): Promise<{ error: string | null }> {
+  if (!supabase) return { error: 'Supabase not configured' };
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      redirectTo: window.location.origin,
+    },
+  });
+  return { error: error?.message ?? null };
+}
+
 export async function signOutAdmin(): Promise<void> {
   if (!supabase) return;
   await supabase.auth.signOut();

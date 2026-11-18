@@ -80,6 +80,8 @@ export const BAKHYT_KAYNAR_AUDIO_MAP: Record<string, string> = {
   "nury-alemning": "song-13248",
   "nur-alemning": "song-13248",
   "ar-sozimning-maqsaty": "song-ar-sozimning-maqsaty",
+  "sudan-sharap-zhasadyng": "song-99411",
+  "tangir-maghan-soyleding-sen": "song-5804",
 };
 
 export const bakhytKaynarSongs: KaynarSong[] = [
