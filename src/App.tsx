@@ -3,9 +3,13 @@ import type { Session } from '@supabase/supabase-js';
 import {
   ArrowLeft,
   BookOpen,
+  ListCheck,
+  ListPlus,
   Music,
+  Play,
   Search,
   Settings,
+  Shuffle,
   X,
 } from 'lucide-react';
 import { AuthModal } from './components/AuthModal';
@@ -17,6 +21,11 @@ import { NoticeReportSheet } from './components/NoticeReportSheet';
 import { SettingsAdminView } from './components/SettingsAdminView';
 import { SongRow } from './components/SongRow';
 import { UploadView } from './components/UploadView';
+import {
+  BAKHYT_KAYNAR_AUDIO_MAP,
+  bakhytKaynarSongs,
+  type KaynarSong,
+} from './data/bakhytKaynarSongs';
 import { useAudioPlayer } from './hooks/useAudioPlayer';
 import { translations } from './i18n/translations';
 import {
@@ -33,6 +42,20 @@ const LANGS: Language[] = ['kk', 'ko', 'en', 'ru'];
 const PLAYLIST_KEY = 'kwp_playlist_ids_v1';
 const LIKED_KEY = 'kwp_liked_ids_v1';
 const DEV_KAYNAR_KEY = 'kwp_dev_show_kaynar';
+
+type ListenFilter = 'all' | 'kaynar' | 'playlist' | 'liked';
+
+const KAYNAR_BY_ID = new Map<string, KaynarSong>(bakhytKaynarSongs.map((s) => [s.id, s]));
+const KAYNAR_SONG_BY_AUDIO_ID = new Map<string, KaynarSong>();
+for (const [kaynarId, audioSongId] of Object.entries(BAKHYT_KAYNAR_AUDIO_MAP)) {
+  const kSong = KAYNAR_BY_ID.get(kaynarId);
+  if (!kSong) continue;
+  const existing = KAYNAR_SONG_BY_AUDIO_ID.get(audioSongId);
+  if (!existing || (kSong.sections?.length ?? 0) > (existing.sections?.length ?? 0)) {
+    KAYNAR_SONG_BY_AUDIO_ID.set(audioSongId, kSong);
+  }
+}
+const KAYNAR_AUDIO_IDS = new Set<string>(Object.values(BAKHYT_KAYNAR_AUDIO_MAP));
 
 export function App() {
   const [lang, setLang] = useState<Language>(() => {
@@ -75,6 +98,8 @@ export function App() {
     return localStorage.getItem('kwp_guest_song_done') === 'true';
   });
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [listenFilter, setListenFilter] = useState<ListenFilter>('all');
+  const [preferredLyricsVersion, setPreferredLyricsVersion] = useState<'standard' | 'kaynar'>('standard');
   const pendingSongRef = useRef<Song | null>(null);
   const pendingPromptOnVisibleRef = useRef(false);
   const [showKaynarTab, setShowKaynarTab] = useState<boolean>(() => {
@@ -162,6 +187,21 @@ export function App() {
     });
   }, []);
 
+  const handleAddAllToPlaylist = useCallback((songsToAdd: Song[]) => {
+    setPlaylistIds((prev) => {
+      const existing = new Set(prev);
+      const additions = songsToAdd.map((s) => s.id).filter((id) => !existing.has(id));
+      if (additions.length === 0) return prev;
+      const next = [...prev, ...additions];
+      try {
+        localStorage.setItem(PLAYLIST_KEY, JSON.stringify(next));
+      } catch {
+        // Ignore storage errors
+      }
+      return next;
+    });
+  }, []);
+
   const publishedSongs = useMemo(
     () => songs.filter((s) => s.status === 'published' && s.is_active),
     [songs]
@@ -177,7 +217,55 @@ export function App() {
     [publishedSongs]
   );
 
-  const libraryQueue = useMemo(() => topChartSongs, [topChartSongs]);
+  const filteredSongs = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return topChartSongs;
+    return topChartSongs.filter((s) => {
+      const kSong = KAYNAR_SONG_BY_AUDIO_ID.get(s.id);
+      const kaynarTitleMatch =
+        kSong &&
+        (kSong.title.kk.toLowerCase().includes(q) ||
+          (kSong.title.ko && kSong.title.ko.toLowerCase().includes(q)) ||
+          (kSong.title.koHymn && kSong.title.koHymn.toLowerCase().includes(q)) ||
+          (kSong.title.reading && kSong.title.reading.toLowerCase().includes(q)));
+      return (
+        s.title.toLowerCase().includes(q) ||
+        s.artist.toLowerCase().includes(q) ||
+        (s.lyrics && s.lyrics.toLowerCase().includes(q)) ||
+        Boolean(kaynarTitleMatch)
+      );
+    });
+  }, [topChartSongs, search]);
+
+  const kaynarPlayableCount = useMemo(
+    () => topChartSongs.filter((s) => KAYNAR_AUDIO_IDS.has(s.id)).length,
+    [topChartSongs]
+  );
+
+  const listenSongs = useMemo(() => {
+    if (listenFilter === 'kaynar') {
+      return filteredSongs.filter((s) => KAYNAR_AUDIO_IDS.has(s.id));
+    }
+    if (listenFilter === 'playlist') {
+      const q = search.trim().toLowerCase();
+      if (!q) return playlistSongs;
+      return playlistSongs.filter(
+        (s) =>
+          s.title.toLowerCase().includes(q) ||
+          s.artist.toLowerCase().includes(q) ||
+          (s.lyrics && s.lyrics.toLowerCase().includes(q))
+      );
+    }
+    if (listenFilter === 'liked') {
+      return filteredSongs.filter((s) => likedIds.includes(s.id));
+    }
+    return filteredSongs;
+  }, [filteredSongs, likedIds, listenFilter, playlistSongs, search]);
+
+  const libraryQueue = useMemo(
+    () => (listenSongs.length > 0 ? listenSongs : topChartSongs),
+    [listenSongs, topChartSongs]
+  );
 
   const handleBeforePlay = useCallback(
     (song: Song) => {
@@ -267,17 +355,6 @@ export function App() {
     topChartSongs.forEach((s, idx) => map.set(s.id, idx + 1));
     return map;
   }, [topChartSongs]);
-
-  const filteredSongs = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return topChartSongs;
-    return topChartSongs.filter(
-      (s) =>
-        s.title.toLowerCase().includes(q) ||
-        s.artist.toLowerCase().includes(q) ||
-        (s.lyrics && s.lyrics.toLowerCase().includes(q))
-    );
-  }, [topChartSongs, search]);
 
   const offlineSongs = useMemo(
     () => filteredSongs.filter((s) => offlineIds.includes(s.id)),
@@ -372,61 +449,118 @@ export function App() {
             <>
               <InstallPromptBanner t={t} />
 
-              {/* My Playlist Section */}
-              {!search.trim() && playlistSongs.length > 0 && (
-                <section className="space-y-1">
-                  <div className="flex items-center justify-between mb-1">
-                    <h2 className="text-sm font-extrabold tracking-tight text-[#1D1D1F]">
-                      {t.myPlaylistTitle}
-                    </h2>
-                    <span className="text-xs font-bold text-[#FA243C]">
-                      {playlistSongs.length}
-                    </span>
-                  </div>
-                  <div className="divide-y divide-black/[0.06]">
-                    {playlistSongs.map((s) => (
-                      <SongRow
-                        key={`pl-${s.id}`}
-                        song={s}
-                        isCurrent={player.currentSong?.id === s.id}
-                        isPlaying={player.isPlaying}
-                        isOffline={offlineIds.includes(s.id)}
-                        isSavingOffline={savingOfflineId === s.id}
-                        isInPlaylist={true}
-                        t={t}
-                        onPlay={(song) => void player.playSong(song)}
-                        onToggleOffline={(song) => void handleToggleOffline(song)}
-                        onTogglePlaylist={handleTogglePlaylist}
-                        isLiked={likedIds.includes(s.id)}
-                        onToggleLike={handleToggleLike}
-                        onOpenReport={(song) => {
-                          setReportTargetSong(song);
-                          setNoticeOpen(true);
-                        }}
-                      />
-                    ))}
-                  </div>
-                </section>
+              {/* Filter Chips (All | Бақыт қайнар | My Playlist | Liked) */}
+              <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
+                {(
+                  [
+                    { id: 'all', label: t.filterAll, count: topChartSongs.length },
+                    { id: 'kaynar', label: t.tabKaynar, count: kaynarPlayableCount },
+                    { id: 'playlist', label: t.myPlaylistTitle, count: playlistSongs.length },
+                    { id: 'liked', label: t.filterLiked, count: likedIds.length },
+                  ] as const
+                ).map((chip) => {
+                  const active = listenFilter === chip.id;
+                  return (
+                    <button
+                      key={chip.id}
+                      type="button"
+                      onClick={() => setListenFilter(chip.id)}
+                      className={`px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap flex items-center gap-1.5 transition shrink-0 ${
+                        active
+                          ? 'bg-[#FA243C] text-white shadow-xs'
+                          : 'bg-[#F5F5F7] text-[#1D1D1F] active:bg-black/10'
+                      }`}
+                    >
+                      <span>{chip.label}</span>
+                      <span
+                        className={`text-[10px] font-extrabold tabular-nums ${
+                          active ? 'text-white/85' : 'text-[#86868B]'
+                        }`}
+                      >
+                        {chip.count}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Play / Shuffle / Add All Action Bar */}
+              {listenSongs.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPreferredLyricsVersion(listenFilter === 'kaynar' ? 'kaynar' : 'standard');
+                      if (listenSongs[0]) void player.playSong(listenSongs[0]);
+                    }}
+                    className="flex-1 py-2.5 rounded-xl bg-[#FA243C] text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs active:opacity-85 transition"
+                  >
+                    <Play className="w-3.5 h-3.5 fill-white" />
+                    <span>{t.playBtn}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPreferredLyricsVersion(listenFilter === 'kaynar' ? 'kaynar' : 'standard');
+                      if (!player.isShuffle) player.toggleShuffle();
+                      const pick = listenSongs[Math.floor(Math.random() * listenSongs.length)];
+                      if (pick) void player.playSong(pick);
+                    }}
+                    className="flex-1 py-2.5 rounded-xl bg-[#F5F5F7] text-[#FA243C] text-xs font-bold flex items-center justify-center gap-1.5 active:bg-black/10 transition"
+                  >
+                    <Shuffle className="w-3.5 h-3.5" />
+                    <span>{t.shuffleBtn}</span>
+                  </button>
+                  {listenFilter !== 'playlist' && (() => {
+                    const allInPlaylist = listenSongs.every((s) => playlistIds.includes(s.id));
+                    return (
+                      <button
+                        type="button"
+                        onClick={() => handleAddAllToPlaylist(listenSongs)}
+                        disabled={allInPlaylist}
+                        title={allInPlaylist ? t.addedAllToPlaylist : t.addAllToPlaylist}
+                        className={`px-3 py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1 shrink-0 transition ${
+                          allInPlaylist
+                            ? 'bg-[#34C759]/15 text-[#34C759]'
+                            : 'bg-[#F5F5F7] text-[#1D1D1F] active:bg-black/10'
+                        }`}
+                      >
+                        {allInPlaylist ? (
+                          <ListCheck className="w-3.5 h-3.5" />
+                        ) : (
+                          <ListPlus className="w-3.5 h-3.5" />
+                        )}
+                        <span>{allInPlaylist ? t.addedAllToPlaylist : t.addAllToPlaylist}</span>
+                      </button>
+                    );
+                  })()}
+                </div>
               )}
 
-              {/* All Songs List */}
+              {/* Filtered Songs List */}
               <section className="space-y-1">
-                {filteredSongs.length === 0 ? (
-                  <p className="text-xs text-[#86868B] text-center py-8">{t.noSongsFound}</p>
+                {listenSongs.length === 0 ? (
+                  <p className="text-xs text-[#86868B] text-center py-8">
+                    {listenFilter === 'playlist' ? t.playlistEmpty : t.noSongsFound}
+                  </p>
                 ) : (
                   <div className="divide-y divide-black/[0.06]">
-                    {filteredSongs.map((s, idx) => (
+                    {listenSongs.map((s, idx) => (
                       <SongRow
                         key={s.id}
                         song={s}
-                        rank={songRankMap.get(s.id) ?? idx + 1}
+                        rank={listenFilter === 'all' ? (songRankMap.get(s.id) ?? idx + 1) : idx + 1}
                         isCurrent={player.currentSong?.id === s.id}
                         isPlaying={player.isPlaying}
                         isOffline={offlineIds.includes(s.id)}
                         isSavingOffline={savingOfflineId === s.id}
                         isInPlaylist={playlistIds.includes(s.id)}
+                        isKaynar={listenFilter === 'all' && KAYNAR_AUDIO_IDS.has(s.id)}
                         t={t}
-                        onPlay={(song) => void player.playSong(song)}
+                        onPlay={(song) => {
+                          setPreferredLyricsVersion(listenFilter === 'kaynar' ? 'kaynar' : 'standard');
+                          void player.playSong(song);
+                        }}
                         onToggleOffline={(song) => void handleToggleOffline(song)}
                         onTogglePlaylist={handleTogglePlaylist}
                         isLiked={likedIds.includes(s.id)}
@@ -503,7 +637,10 @@ export function App() {
               songs={publishedSongs}
               currentSong={player.currentSong}
               isPlaying={player.isPlaying}
-              onPlaySong={(song) => void player.playSong(song)}
+              onPlaySong={(song) => {
+                setPreferredLyricsVersion('kaynar');
+                void player.playSong(song);
+              }}
             />
           )}
 
@@ -684,6 +821,9 @@ export function App() {
           <FullPlayerSheet
             isOpen={isFullPlayerOpen}
             song={player.currentSong}
+            kaynarSong={KAYNAR_SONG_BY_AUDIO_ID.get(player.currentSong.id) ?? null}
+            lang={lang}
+            defaultLyricsVersion={preferredLyricsVersion}
             isPlaying={player.isPlaying}
             isOffline={offlineIds.includes(player.currentSong.id)}
             currentTime={player.currentTime}

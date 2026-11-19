@@ -91,6 +91,11 @@ export interface TranslationStrings {
   authOrDivider: string;
   authAccountTitle: string;
   authSignOutBtn: string;
+  filterAll: string;
+  filterLiked: string;
+  addAllToPlaylist: string;
+  addedAllToPlaylist: string;
+  lyricsStandard: string;
 }
 
 export const translations: Record<Language, TranslationStrings> = {
@@ -184,7 +189,12 @@ export const translations: Record<Language, TranslationStrings> = {
     authGoogleBtn: 'Google арқылы кіру',
     authOrDivider: 'немесе',
     authAccountTitle: 'Тіркелгі',
-    authSignOutBtn: 'Шығу'
+    authSignOutBtn: 'Шығу',
+    filterAll: 'Барлығы',
+    filterLiked: 'Ұнаған',
+    addAllToPlaylist: 'Барлығын қосу',
+    addedAllToPlaylist: 'Қосылды',
+    lyricsStandard: 'Негізгі'
   },
   ko: {
     brand: '카자흐 찬양',
@@ -276,7 +286,12 @@ export const translations: Record<Language, TranslationStrings> = {
     authGoogleBtn: 'Google로 계속하기',
     authOrDivider: '또는',
     authAccountTitle: '계정',
-    authSignOutBtn: '로그아웃'
+    authSignOutBtn: '로그아웃',
+    filterAll: '전체',
+    filterLiked: '좋아요',
+    addAllToPlaylist: '전체 담기',
+    addedAllToPlaylist: '담김',
+    lyricsStandard: '기본 가사'
   },
   en: {
     brand: 'Kazakh Worship',
@@ -368,7 +383,12 @@ export const translations: Record<Language, TranslationStrings> = {
     authGoogleBtn: 'Continue with Google',
     authOrDivider: 'or',
     authAccountTitle: 'Account',
-    authSignOutBtn: 'Sign Out'
+    authSignOutBtn: 'Sign Out',
+    filterAll: 'All',
+    filterLiked: 'Liked',
+    addAllToPlaylist: 'Add All',
+    addedAllToPlaylist: 'Added',
+    lyricsStandard: 'Standard'
   },
   ru: {
     brand: 'Казахские Песни',
@@ -460,6 +480,11 @@ export const translations: Record<Language, TranslationStrings> = {
     authGoogleBtn: 'Войти через Google',
     authOrDivider: 'или',
     authAccountTitle: 'Аккаунт',
-    authSignOutBtn: 'Выйти'
+    authSignOutBtn: 'Выйти',
+    filterAll: 'Все',
+    filterLiked: 'Избранное',
+    addAllToPlaylist: 'Добавить все',
+    addedAllToPlaylist: 'Добавлено',
+    lyricsStandard: 'Обычный'
   }
 };

@@ -25,6 +25,7 @@ interface SongRowProps {
   isSavingOffline?: boolean;
   isInPlaylist?: boolean;
   isLiked?: boolean;
+  isKaynar?: boolean;
   t: TranslationStrings;
   onPlay: (song: Song) => void;
   onToggleOffline?: (song: Song) => void;
@@ -40,6 +41,7 @@ export function SongRow({
   isPlaying,
   isInPlaylist = false,
   isLiked = false,
+  isKaynar = false,
   t,
   onPlay,
   onTogglePlaylist,
@@ -88,9 +90,16 @@ export function SongRow({
           >
             {song.title}
           </p>
-          <p className="text-xs text-[#86868B] truncate">
-            {authorLabel} · ▶ {song.play_count.toLocaleString()} {t.plays}
-          </p>
+          <div className="flex items-center gap-1.5 min-w-0">
+            <p className="text-xs text-[#86868B] truncate">
+              {authorLabel} · ▶ {song.play_count.toLocaleString()} {t.plays}
+            </p>
+            {isKaynar && (
+              <span className="px-1.5 py-0.5 rounded-md bg-[#FA243C]/10 text-[#FA243C] text-[9px] font-bold shrink-0">
+                {t.tabKaynar}
+              </span>
+            )}
+          </div>
         </div>
       </button>
 

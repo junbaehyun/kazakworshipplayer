@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Check, Copy, Music2, X } from 'lucide-react';
+import type { KaynarSong } from '../data/bakhytKaynarSongs';
+import type { Language } from '../types';
 
 interface Stanza {
   tag: string | null;
@@ -8,6 +10,11 @@ interface Stanza {
 
 interface LyricsViewProps {
   lyrics: string;
+  kaynarSong?: KaynarSong | null;
+  lang: Language;
+  defaultVersion?: 'standard' | 'kaynar';
+  standardLabel: string;
+  kaynarLabel: string;
   title: string;
   author: string;
   gradient: string;
@@ -52,6 +59,11 @@ function parseStanzas(raw: string): Stanza[] {
 
 export function LyricsView({
   lyrics,
+  kaynarSong = null,
+  lang,
+  defaultVersion = 'standard',
+  standardLabel,
+  kaynarLabel,
   title,
   author,
   gradient,
@@ -64,29 +76,54 @@ export function LyricsView({
 }: LyricsViewProps) {
   const [fontStep, setFontStep] = useState<0 | 1 | 2>(1);
   const [copied, setCopied] = useState(false);
+  const [version, setVersion] = useState<'standard' | 'kaynar'>(
+    kaynarSong ? defaultVersion : 'standard'
+  );
   const lastManualScrollRef = useRef(0);
   const stanzaRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
+  useEffect(() => {
+    setVersion(kaynarSong ? defaultVersion : 'standard');
+  }, [kaynarSong, defaultVersion, title]);
+
+  const activeVersion = kaynarSong ? version : 'standard';
+
   const stanzas = useMemo(() => parseStanzas(lyrics), [lyrics]);
+  const kaynarSections = useMemo(() => kaynarSong?.sections ?? [], [kaynarSong]);
+  const totalBlocks = activeVersion === 'kaynar' ? kaynarSections.length : stanzas.length;
 
   const activeIndex = useMemo(() => {
-    if (stanzas.length <= 1 || duration <= 0) return 0;
+    if (totalBlocks <= 1 || duration <= 0) return 0;
     const progress = Math.min(0.999, Math.max(0, currentTime / duration));
-    return Math.min(stanzas.length - 1, Math.floor(progress * stanzas.length));
-  }, [stanzas.length, currentTime, duration]);
+    return Math.min(totalBlocks - 1, Math.floor(progress * totalBlocks));
+  }, [totalBlocks, currentTime, duration]);
 
   useEffect(() => {
-    if (!isPlaying || stanzas.length <= 1) return;
+    if (!isPlaying || totalBlocks <= 1) return;
     if (Date.now() - lastManualScrollRef.current < 3000) return;
 
     const el = stanzaRefs.current[activeIndex];
     el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  }, [activeIndex, isPlaying, stanzas.length]);
+  }, [activeIndex, isPlaying, totalBlocks]);
+
+  const copyableText = useMemo(() => {
+    if (activeVersion === 'kaynar' && kaynarSong) {
+      return kaynarSong.sections
+        .map((sec) => {
+          const header = sec.label[lang === 'ko' ? 'ko' : 'kk'] || sec.label.kk || '';
+          const body = sec.lines.map((l) => l.kk).filter(Boolean).join('\n');
+          return header ? `[${header}]\n${body}` : body;
+        })
+        .join('\n\n')
+        .trim();
+    }
+    return lyrics.trim();
+  }, [activeVersion, kaynarSong, lang, lyrics]);
 
   const handleCopy = async () => {
-    if (!lyrics.trim()) return;
+    if (!copyableText) return;
     try {
-      await navigator.clipboard.writeText(lyrics.trim());
+      await navigator.clipboard.writeText(copyableText);
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1800);
     } catch {
@@ -132,7 +169,7 @@ export function LyricsView({
           <button
             type="button"
             onClick={() => void handleCopy()}
-            disabled={!lyrics.trim()}
+            disabled={!copyableText}
             aria-label="Copy lyrics"
             className="p-1.5 rounded-lg bg-[#F5F5F7] text-[#1D1D1F] disabled:opacity-35 active:scale-95 transition"
           >
@@ -153,6 +190,36 @@ export function LyricsView({
         </div>
       </div>
 
+      {/* 2-Version Lyrics Switcher (Standard vs Бақыт қайнар) */}
+      {kaynarSong && (
+        <div className="px-4 py-2 border-b border-black/[0.05] bg-[#F5F5F7]/60 shrink-0">
+          <div className="grid grid-cols-2 gap-1 p-0.5 rounded-xl bg-black/[0.05]">
+            <button
+              type="button"
+              onClick={() => setVersion('standard')}
+              className={`py-1.5 rounded-lg text-[11px] font-bold transition ${
+                activeVersion === 'standard'
+                  ? 'bg-white text-[#1D1D1F] shadow-xs'
+                  : 'text-[#86868B]'
+              }`}
+            >
+              {standardLabel}
+            </button>
+            <button
+              type="button"
+              onClick={() => setVersion('kaynar')}
+              className={`py-1.5 rounded-lg text-[11px] font-bold transition ${
+                activeVersion === 'kaynar'
+                  ? 'bg-white text-[#FA243C] shadow-xs'
+                  : 'text-[#86868B]'
+              }`}
+            >
+              {kaynarLabel}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Scrollable Stanzas with Soft Edge Fade */}
       <div
         onWheel={() => {
@@ -169,7 +236,61 @@ export function LyricsView({
         }}
         className="flex-1 overflow-y-auto px-5 py-6 space-y-6"
       >
-        {stanzas.length === 0 ? (
+        {activeVersion === 'kaynar' && kaynarSong ? (
+          kaynarSections.length === 0 ? (
+            <p className="text-sm font-medium text-[#86868B] text-center py-10">—</p>
+          ) : (
+            kaynarSections.map((sec, idx) => {
+              const isActive = idx === activeIndex;
+              const targetTime = duration > 0 ? (idx / kaynarSections.length) * duration : 0;
+              const secTag = sec.label[lang === 'ko' ? 'ko' : 'kk'] || sec.label.kk || sec.label.ko;
+
+              return (
+                <button
+                  key={`${sec.id}-${idx}`}
+                  ref={(el) => {
+                    stanzaRefs.current[idx] = el;
+                  }}
+                  type="button"
+                  onClick={() => {
+                    if (duration > 0) onSeek(targetTime);
+                  }}
+                  className={`w-full text-left rounded-2xl px-3 py-2 transition-all duration-300 ${
+                    isActive
+                      ? 'bg-[#FA243C]/[0.06] text-[#1D1D1F] opacity-100'
+                      : 'text-[#1D1D1F]/45 hover:text-[#1D1D1F]/75'
+                  }`}
+                >
+                  {secTag && (
+                    <span className="inline-block mb-1.5 px-2.5 py-0.5 rounded-full bg-[#FA243C]/12 text-[#FA243C] text-[10px] font-extrabold uppercase tracking-wider">
+                      {secTag}
+                    </span>
+                  )}
+                  <div className="space-y-2.5">
+                    {sec.lines.map((line, lineIdx) => (
+                      <div key={lineIdx} className="space-y-0.5">
+                        <p className={`font-bold tracking-[-0.01em] ${FONT_SIZE_CLASSES[fontStep]}`}>
+                          {line.kk}
+                        </p>
+                        {lang === 'ko' && line.reading && (
+                          <p className="text-xs font-medium text-[#FA243C]/85">{line.reading}</p>
+                        )}
+                        {lang === 'ko' && (line.koHymn || line.meaning) && (
+                          <p className="text-xs font-medium text-[#6E6E73]">
+                            {line.koHymn || line.meaning}
+                          </p>
+                        )}
+                        {lang === 'en' && line.en && (
+                          <p className="text-xs font-medium text-[#6E6E73]">{line.en}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </button>
+              );
+            })
+          )
+        ) : stanzas.length === 0 ? (
           <p className="text-sm font-medium text-[#86868B] text-center py-10">—</p>
         ) : (
           stanzas.map((stanza, idx) => {

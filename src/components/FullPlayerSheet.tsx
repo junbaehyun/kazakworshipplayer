@@ -14,14 +14,18 @@ import {
   SkipBack,
   SkipForward,
 } from 'lucide-react';
+import type { KaynarSong } from '../data/bakhytKaynarSongs';
 import type { TranslationStrings } from '../i18n/translations';
-import type { RepeatMode, Song } from '../types';
+import type { Language, RepeatMode, Song } from '../types';
 import { LyricsView } from './LyricsView';
 import { getSongGradient } from './SongRow';
 
 interface FullPlayerSheetProps {
   isOpen: boolean;
   song: Song;
+  kaynarSong?: KaynarSong | null;
+  lang: Language;
+  defaultLyricsVersion?: 'standard' | 'kaynar';
   isPlaying: boolean;
   isOffline: boolean;
   currentTime: number;
@@ -50,6 +54,9 @@ function formatTime(sec: number): string {
 export function FullPlayerSheet({
   isOpen,
   song,
+  kaynarSong = null,
+  lang,
+  defaultLyricsVersion = 'standard',
   isPlaying,
   isOffline,
   currentTime,
@@ -115,6 +122,11 @@ export function FullPlayerSheet({
       ) : (
         <LyricsView
           lyrics={song.lyrics ?? ''}
+          kaynarSong={kaynarSong}
+          lang={lang}
+          defaultVersion={defaultLyricsVersion}
+          standardLabel={t.lyricsStandard}
+          kaynarLabel={t.tabKaynar}
           title={song.title}
           author={author}
           gradient={gradient}
