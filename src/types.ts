@@ -18,6 +18,7 @@ export interface Song {
   lyrics?: string | null;
   song_key?: string | null;
   capo?: number | null;
+  lang?: Language;
   play_count: number;
   uploaded_by: string;
   status: SongStatus;

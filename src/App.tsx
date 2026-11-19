@@ -54,7 +54,7 @@ const PLAYLIST_KEY = 'kwp_playlist_ids_v1';
 const LIKED_KEY = 'kwp_liked_ids_v1';
 const DEV_KAYNAR_KEY = 'kwp_dev_show_kaynar';
 
-type ListenFilter = 'all' | 'kaynar' | 'playlist' | 'offline';
+type ListenFilter = 'all' | 'kaynar' | 'ru' | 'playlist' | 'offline';
 const GUITAR_KEYS = ['all', 'C', 'D', 'Dm', 'E', 'Em', 'F', 'G', 'A', 'Am', 'Bm', 'Bb'] as const;
 
 const KAYNAR_BY_ID = new Map<string, KaynarSong>(bakhytKaynarSongs.map((s) => [s.id, s]));
@@ -298,6 +298,8 @@ export function App() {
               s.artist.toLowerCase().includes(q) ||
               (s.lyrics && s.lyrics.replace(/\[[^\]]+\]/g, '').toLowerCase().includes(q))
           );
+    } else if (listenFilter === 'ru') {
+      base = filteredSongs.filter((s) => s.lang === 'ru' || s.id.startsWith('song-ru-'));
     } else if (listenFilter === 'offline') {
       base = filteredSongs.filter((s) => offlineIds.includes(s.id));
     } else {
@@ -642,12 +644,19 @@ export function App() {
             <>
               <InstallPromptBanner t={t} />
 
-              {/* Filter Chips (All | Бақыт қайнар | My Playlist | Offline) */}
+              {/* Filter Chips (All | Бақыт қайнар | Русский | My Playlist | Offline) */}
               <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
                 {(
                   [
                     { id: 'all', label: t.filterAll, count: topChartSongs.length },
                     { id: 'kaynar', label: t.tabKaynar, count: kaynarPlayableCount },
+                    {
+                      id: 'ru',
+                      label: 'Русский',
+                      count: topChartSongs.filter(
+                        (s) => s.lang === 'ru' || s.id.startsWith('song-ru-')
+                      ).length,
+                    },
                     { id: 'playlist', label: t.myPlaylistTitle, count: playlistSongs.length },
                     { id: 'offline', label: t.tabOffline, count: offlineIds.length },
                   ] as const
