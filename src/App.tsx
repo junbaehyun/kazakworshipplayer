@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import {
   ArrowLeft,
@@ -20,17 +20,28 @@ import {
   WifiOff,
   X,
 } from 'lucide-react';
-import { AuthModal } from './components/AuthModal';
-import { BakhytKaynarView } from './components/BakhytKaynarView';
-import { FlipCoverView } from './components/FlipCoverView';
-import { FullPlayerSheet } from './components/FullPlayerSheet';
 import { InstallPromptBanner } from './components/InstallPromptBanner';
-import { LyricsView } from './components/LyricsView';
 import { MiniPlayer } from './components/MiniPlayer';
-import { NoticeReportSheet } from './components/NoticeReportSheet';
-import { SettingsAdminView } from './components/SettingsAdminView';
 import { getSongGradient, SongRow } from './components/SongRow';
-import { UploadView } from './components/UploadView';
+
+const AuthModal = lazy(() => import('./components/AuthModal').then((m) => ({ default: m.AuthModal })));
+const BakhytKaynarView = lazy(() =>
+  import('./components/BakhytKaynarView').then((m) => ({ default: m.BakhytKaynarView }))
+);
+const FlipCoverView = lazy(() =>
+  import('./components/FlipCoverView').then((m) => ({ default: m.FlipCoverView }))
+);
+const FullPlayerSheet = lazy(() =>
+  import('./components/FullPlayerSheet').then((m) => ({ default: m.FullPlayerSheet }))
+);
+const LyricsView = lazy(() => import('./components/LyricsView').then((m) => ({ default: m.LyricsView })));
+const NoticeReportSheet = lazy(() =>
+  import('./components/NoticeReportSheet').then((m) => ({ default: m.NoticeReportSheet }))
+);
+const SettingsAdminView = lazy(() =>
+  import('./components/SettingsAdminView').then((m) => ({ default: m.SettingsAdminView }))
+);
+const UploadView = lazy(() => import('./components/UploadView').then((m) => ({ default: m.UploadView })));
 import {
   BAKHYT_KAYNAR_AUDIO_MAP,
   bakhytKaynarSongs,
@@ -41,6 +52,7 @@ import { useWakeLock } from './hooks/useWakeLock';
 import { translations } from './i18n/translations';
 import {
   clearAllOfflineBlobs,
+  ensureExtraSongsLoaded,
   getWeeklyChartInfo,
   listOfflineIds,
   removeOfflineBlob,
@@ -56,6 +68,8 @@ const DEV_KAYNAR_KEY = 'kwp_show_kaynar_tab';
 
 type ListenFilter = 'all' | 'kaynar' | 'ru' | 'playlist' | 'offline';
 const GUITAR_KEYS = ['all', 'C', 'D', 'Dm', 'E', 'Em', 'F', 'G', 'A', 'Am', 'Bm', 'Bb'] as const;
+
+const PAGE_SIZE = 80;
 
 const KAYNAR_BY_ID = new Map<string, KaynarSong>(bakhytKaynarSongs.map((s) => [s.id, s]));
 const KAYNAR_SONG_BY_AUDIO_ID = new Map<string, KaynarSong>();
@@ -126,6 +140,8 @@ export function App() {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [listenFilter, setListenFilter] = useState<ListenFilter>('all');
   const [selectedKey, setSelectedKey] = useState<string>('all');
+  const [visibleCount, setVisibleCount] = useState<number>(PAGE_SIZE);
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const [readerSongId, setReaderSongId] = useState<string | null>(null);
   const [copiedSetlist, setCopiedSetlist] = useState(false);
   const [preferredLyricsVersion, setPreferredLyricsVersion] = useState<'standard' | 'kaynar'>('standard');
@@ -180,7 +196,11 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    void refreshSongs();
+    void refreshSongs().then(() => {
+      void ensureExtraSongsLoaded().then((extra) => {
+        if (extra.length > 0) void refreshSongs();
+      });
+    });
     void refreshOfflineStats();
   }, [refreshSongs, refreshOfflineStats]);
 
@@ -244,6 +264,10 @@ export function App() {
     });
   }, []);
 
+  const offlineIdSet = useMemo(() => new Set(offlineIds), [offlineIds]);
+  const playlistIdSet = useMemo(() => new Set(playlistIds), [playlistIds]);
+  const likedIdSet = useMemo(() => new Set(likedIds), [likedIds]);
+
   const publishedSongs = useMemo(
     () => songs.filter((s) => s.status === 'published' && s.is_active),
     [songs]
@@ -259,28 +283,32 @@ export function App() {
     [publishedSongs]
   );
 
+  const searchTextById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const s of topChartSongs) {
+      const kSong = KAYNAR_SONG_BY_AUDIO_ID.get(s.id);
+      const kaynarPart = kSong
+        ? ` ${kSong.title.kk} ${kSong.title.ko ?? ''} ${kSong.title.koHymn ?? ''} ${kSong.title.reading ?? ''}`
+        : '';
+      const cleanLyrics = s.lyrics ? s.lyrics.replace(/\[[^\]]+\]/g, '') : '';
+      map.set(s.id, `${s.title} ${s.artist} ${cleanLyrics}${kaynarPart}`.toLowerCase());
+    }
+    return map;
+  }, [topChartSongs]);
+
   const filteredSongs = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return topChartSongs;
-    return topChartSongs.filter((s) => {
-      const kSong = KAYNAR_SONG_BY_AUDIO_ID.get(s.id);
-      const kaynarTitleMatch =
-        kSong &&
-        (kSong.title.kk.toLowerCase().includes(q) ||
-          (kSong.title.ko && kSong.title.ko.toLowerCase().includes(q)) ||
-          (kSong.title.koHymn && kSong.title.koHymn.toLowerCase().includes(q)) ||
-          (kSong.title.reading && kSong.title.reading.toLowerCase().includes(q)));
-      return (
-        s.title.toLowerCase().includes(q) ||
-        s.artist.toLowerCase().includes(q) ||
-        (s.lyrics && s.lyrics.replace(/\[[^\]]+\]/g, '').toLowerCase().includes(q)) ||
-        Boolean(kaynarTitleMatch)
-      );
-    });
-  }, [topChartSongs, search]);
+    return topChartSongs.filter((s) => (searchTextById.get(s.id) ?? '').includes(q));
+  }, [topChartSongs, searchTextById, search]);
 
   const kaynarPlayableCount = useMemo(
     () => topChartSongs.filter((s) => KAYNAR_AUDIO_IDS.has(s.id)).length,
+    [topChartSongs]
+  );
+
+  const ruSongsCount = useMemo(
+    () => topChartSongs.filter((s) => s.lang === 'ru' || s.id.startsWith('song-ru-')).length,
     [topChartSongs]
   );
 
@@ -292,16 +320,11 @@ export function App() {
       const q = search.trim().toLowerCase();
       base = !q
         ? playlistSongs
-        : playlistSongs.filter(
-            (s) =>
-              s.title.toLowerCase().includes(q) ||
-              s.artist.toLowerCase().includes(q) ||
-              (s.lyrics && s.lyrics.replace(/\[[^\]]+\]/g, '').toLowerCase().includes(q))
-          );
+        : playlistSongs.filter((s) => (searchTextById.get(s.id) ?? s.title.toLowerCase()).includes(q));
     } else if (listenFilter === 'ru') {
       base = filteredSongs.filter((s) => s.lang === 'ru' || s.id.startsWith('song-ru-'));
     } else if (listenFilter === 'offline') {
-      base = filteredSongs.filter((s) => offlineIds.includes(s.id));
+      base = filteredSongs.filter((s) => offlineIdSet.has(s.id));
     } else {
       base = filteredSongs;
     }
@@ -313,7 +336,45 @@ export function App() {
       });
     }
     return base;
-  }, [filteredSongs, listenFilter, offlineIds, playlistSongs, search, selectedKey]);
+  }, [filteredSongs, listenFilter, offlineIdSet, playlistSongs, search, searchTextById, selectedKey]);
+
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [listenFilter, selectedKey, search, tab]);
+
+  const visibleListenSongs = useMemo(
+    () => listenSongs.slice(0, visibleCount),
+    [listenSongs, visibleCount]
+  );
+
+  const chartFilteredSongs = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return topChartSongs;
+    return topChartSongs.filter((s) => (searchTextById.get(s.id) ?? '').includes(q));
+  }, [topChartSongs, searchTextById, search]);
+
+  const visibleChartSongs = useMemo(
+    () => chartFilteredSongs.slice(0, visibleCount),
+    [chartFilteredSongs, visibleCount]
+  );
+
+  useEffect(() => {
+    const el = loadMoreRef.current;
+    if (!el) return;
+    const total = tab === 'chart' ? chartFilteredSongs.length : listenSongs.length;
+    if (visibleCount >= total) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          setVisibleCount((prev) => Math.min(total, prev + PAGE_SIZE));
+        }
+      },
+      { rootMargin: '320px' }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [tab, chartFilteredSongs.length, listenSongs.length, visibleCount]);
 
   const playableListenSongs = useMemo(
     () => listenSongs.filter((s) => Boolean(s.audio_url && s.audio_url.trim())),
@@ -422,23 +483,46 @@ export function App() {
     void player.playSong(libraryQueue[0]);
   }, [libraryQueue, player]);
 
-  const handleToggleOffline = async (song: Song) => {
-    if (offlineIds.includes(song.id)) {
-      await removeOfflineBlob(song.id);
-      await refreshOfflineStats();
-      return;
-    }
+  const handleToggleOffline = useCallback(
+    async (song: Song) => {
+      if (offlineIdSet.has(song.id)) {
+        await removeOfflineBlob(song.id);
+        await refreshOfflineStats();
+        return;
+      }
 
-    setSavingOfflineId(song.id);
-    try {
-      await fetchAndCacheAudioBlob(song);
-      await refreshOfflineStats();
-    } catch (err) {
-      console.error('Failed to save offline:', err);
-    } finally {
-      setSavingOfflineId(null);
-    }
-  };
+      setSavingOfflineId(song.id);
+      try {
+        await fetchAndCacheAudioBlob(song);
+        await refreshOfflineStats();
+      } catch (err) {
+        console.error('Failed to save offline:', err);
+      } finally {
+        setSavingOfflineId(null);
+      }
+    },
+    [offlineIdSet, refreshOfflineStats]
+  );
+
+  const handleRowPlay = useCallback(
+    (song: Song) => {
+      setPreferredLyricsVersion(listenFilter === 'kaynar' ? 'kaynar' : 'standard');
+      void player.playSong(song);
+    },
+    [listenFilter, player.playSong]
+  );
+
+  const handleRowToggleOffline = useCallback(
+    (song: Song) => {
+      void handleToggleOffline(song);
+    },
+    [handleToggleOffline]
+  );
+
+  const handleRowOpenReport = useCallback((song: Song) => {
+    setReportTargetSong(song);
+    setNoticeOpen(true);
+  }, []);
 
   const handleBatchSaveOffline = async (targetSongs: Song[]) => {
     if (batchOfflineProgress) {
@@ -489,8 +573,13 @@ export function App() {
   }, [topChartSongs]);
 
   const offlineSongs = useMemo(
-    () => filteredSongs.filter((s) => offlineIds.includes(s.id)),
-    [filteredSongs, offlineIds]
+    () => filteredSongs.filter((s) => offlineIdSet.has(s.id)),
+    [filteredSongs, offlineIdSet]
+  );
+
+  const weeklyResetDateLabel = useMemo(
+    () => new Date(getWeeklyChartInfo().nextResetAt).toLocaleDateString(),
+    []
   );
 
   const pageTitle =
@@ -509,62 +598,64 @@ export function App() {
   if (isCoverMode) {
     return (
       <div className="fixed inset-0 w-screen h-[100dvh] bg-white overflow-hidden">
-        <FlipCoverView
-          lang={lang}
-          t={t}
-          song={player.currentSong}
-          kaynarSong={
-            player.currentSong
-              ? (KAYNAR_SONG_BY_AUDIO_ID.get(player.currentSong.id) ?? null)
-              : null
-          }
-          defaultLyricsVersion={preferredLyricsVersion}
-          isPlaying={player.isPlaying}
-          currentTime={player.currentTime}
-          duration={player.duration}
-          repeatMode={player.repeatMode}
-          isShuffle={player.isShuffle}
-          allSongs={playableTopChartSongs}
-          kaynarAudioIds={KAYNAR_AUDIO_IDS}
-          playlistIds={playlistIds}
-          wakeLockEnabled={wakeLock.enabled}
-          wakeLockLocked={wakeLock.isLocked}
-          onToggleWakeLock={wakeLock.toggleWakeLock}
-          onExitCoverMode={() => setIsCoverMode(false)}
-          onTogglePlay={() => void player.togglePlay()}
-          onPrev={player.playPrev}
-          onNext={() => player.playNext(false)}
-          onSeek={player.seekTo}
-          onCycleRepeat={player.cycleRepeat}
-          onToggleShuffle={player.toggleShuffle}
-          onPlaySong={(s, fromKaynar) => {
-            setPreferredLyricsVersion(fromKaynar ? 'kaynar' : 'standard');
-            void player.playSong(s);
-          }}
-          onTogglePlaylist={handleTogglePlaylist}
-        />
-        <AuthModal
-          isOpen={isAuthModalOpen}
-          t={t}
-          onClose={() => setIsAuthModalOpen(false)}
-          onAuthenticated={(nextSession, localEmail) => {
-            isAuthenticatedRef.current = true;
-            if (nextSession) {
-              setSession(nextSession);
-            } else if (localEmail) {
-              localStorage.setItem('kwp_local_user_email', localEmail);
-              setLocalUserEmail(localEmail);
+        <Suspense fallback={null}>
+          <FlipCoverView
+            lang={lang}
+            t={t}
+            song={player.currentSong}
+            kaynarSong={
+              player.currentSong
+                ? (KAYNAR_SONG_BY_AUDIO_ID.get(player.currentSong.id) ?? null)
+                : null
             }
-            setIsAuthModalOpen(false);
-            const queued = pendingSongRef.current;
-            pendingSongRef.current = null;
-            if (queued) {
-              void player.playSong(queued);
-            } else {
-              player.playNext(false);
-            }
-          }}
-        />
+            defaultLyricsVersion={preferredLyricsVersion}
+            isPlaying={player.isPlaying}
+            currentTime={player.currentTime}
+            duration={player.duration}
+            repeatMode={player.repeatMode}
+            isShuffle={player.isShuffle}
+            allSongs={playableTopChartSongs}
+            kaynarAudioIds={KAYNAR_AUDIO_IDS}
+            playlistIds={playlistIds}
+            wakeLockEnabled={wakeLock.enabled}
+            wakeLockLocked={wakeLock.isLocked}
+            onToggleWakeLock={wakeLock.toggleWakeLock}
+            onExitCoverMode={() => setIsCoverMode(false)}
+            onTogglePlay={() => void player.togglePlay()}
+            onPrev={player.playPrev}
+            onNext={() => player.playNext(false)}
+            onSeek={player.seekTo}
+            onCycleRepeat={player.cycleRepeat}
+            onToggleShuffle={player.toggleShuffle}
+            onPlaySong={(s, fromKaynar) => {
+              setPreferredLyricsVersion(fromKaynar ? 'kaynar' : 'standard');
+              void player.playSong(s);
+            }}
+            onTogglePlaylist={handleTogglePlaylist}
+          />
+          <AuthModal
+            isOpen={isAuthModalOpen}
+            t={t}
+            onClose={() => setIsAuthModalOpen(false)}
+            onAuthenticated={(nextSession, localEmail) => {
+              isAuthenticatedRef.current = true;
+              if (nextSession) {
+                setSession(nextSession);
+              } else if (localEmail) {
+                localStorage.setItem('kwp_local_user_email', localEmail);
+                setLocalUserEmail(localEmail);
+              }
+              setIsAuthModalOpen(false);
+              const queued = pendingSongRef.current;
+              pendingSongRef.current = null;
+              if (queued) {
+                void player.playSong(queued);
+              } else {
+                player.playNext(false);
+              }
+            }}
+          />
+        </Suspense>
       </div>
     );
   }
@@ -650,13 +741,7 @@ export function App() {
                   [
                     { id: 'all', label: t.filterAll, count: topChartSongs.length },
                     { id: 'kaynar', label: t.tabKaynar, count: kaynarPlayableCount },
-                    {
-                      id: 'ru',
-                      label: 'Русский',
-                      count: topChartSongs.filter(
-                        (s) => s.lang === 'ru' || s.id.startsWith('song-ru-')
-                      ).length,
-                    },
+                    { id: 'ru', label: 'Русский', count: ruSongsCount },
                     { id: 'playlist', label: t.myPlaylistTitle, count: playlistSongs.length },
                     { id: 'offline', label: t.tabOffline, count: offlineIds.length },
                   ] as const
@@ -878,35 +963,44 @@ export function App() {
                       : t.noSongsFound}
                   </p>
                 ) : (
-                  <div className="divide-y divide-black/[0.06]">
-                    {listenSongs.map((s, idx) => (
-                      <SongRow
-                        key={s.id}
-                        song={s}
-                        rank={listenFilter === 'all' ? (songRankMap.get(s.id) ?? idx + 1) : idx + 1}
-                        isCurrent={player.currentSong?.id === s.id}
-                        isPlaying={player.isPlaying}
-                        isOffline={offlineIds.includes(s.id)}
-                        isSavingOffline={savingOfflineId === s.id}
-                        isInPlaylist={playlistIds.includes(s.id)}
-                        isKaynar={listenFilter === 'all' && KAYNAR_AUDIO_IDS.has(s.id)}
-                        t={t}
-                        onPlay={(song) => {
-                          setPreferredLyricsVersion(listenFilter === 'kaynar' ? 'kaynar' : 'standard');
-                          void player.playSong(song);
-                        }}
-                        onOpenLyrics={(song) => handleOpenSongLyrics(song)}
-                        onToggleOffline={(song) => void handleToggleOffline(song)}
-                        onTogglePlaylist={handleTogglePlaylist}
-                        isLiked={likedIds.includes(s.id)}
-                        onToggleLike={handleToggleLike}
-                        onOpenReport={(song) => {
-                          setReportTargetSong(song);
-                          setNoticeOpen(true);
-                        }}
-                      />
-                    ))}
-                  </div>
+                  <>
+                    <div className="divide-y divide-black/[0.06]">
+                      {visibleListenSongs.map((s, idx) => (
+                        <SongRow
+                          key={s.id}
+                          song={s}
+                          rank={listenFilter === 'all' ? (songRankMap.get(s.id) ?? idx + 1) : idx + 1}
+                          isCurrent={player.currentSong?.id === s.id}
+                          isPlaying={player.isPlaying}
+                          isOffline={offlineIdSet.has(s.id)}
+                          isSavingOffline={savingOfflineId === s.id}
+                          isInPlaylist={playlistIdSet.has(s.id)}
+                          isKaynar={listenFilter === 'all' && KAYNAR_AUDIO_IDS.has(s.id)}
+                          t={t}
+                          onPlay={handleRowPlay}
+                          onOpenLyrics={handleOpenSongLyrics}
+                          onToggleOffline={handleRowToggleOffline}
+                          onTogglePlaylist={handleTogglePlaylist}
+                          isLiked={likedIdSet.has(s.id)}
+                          onToggleLike={handleToggleLike}
+                          onOpenReport={handleRowOpenReport}
+                        />
+                      ))}
+                    </div>
+                    {visibleCount < listenSongs.length && (
+                      <div ref={loadMoreRef} className="pt-3 pb-2 flex justify-center">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setVisibleCount((prev) => Math.min(listenSongs.length, prev + PAGE_SIZE))
+                          }
+                          className="px-4 py-2 rounded-full bg-[#F5F5F7] text-[#515154] text-xs font-bold active:bg-black/10 transition"
+                        >
+                          {visibleCount} / {listenSongs.length}
+                        </button>
+                      </div>
+                    )}
+                  </>
                 )}
               </section>
             </>
@@ -928,56 +1022,64 @@ export function App() {
                   <span>{t.tabSettings}</span>
                 </button>
                 <span className="text-[11px] text-[#86868B]">
-                  7d reset · {new Date(getWeeklyChartInfo().nextResetAt).toLocaleDateString()}
+                  7d reset · {weeklyResetDateLabel}
                 </span>
               </div>
               <div className="divide-y divide-black/[0.06]">
-                {topChartSongs
-                  .filter((s) =>
-                    search.trim()
-                      ? s.title.toLowerCase().includes(search.toLowerCase())
-                      : true
-                  )
-                  .map((s, idx) => (
-                    <SongRow
-                      key={s.id}
-                      song={s}
-                      rank={songRankMap.get(s.id) ?? idx + 1}
-                      isCurrent={player.currentSong?.id === s.id}
-                      isPlaying={player.isPlaying}
-                      isOffline={offlineIds.includes(s.id)}
-                      isSavingOffline={savingOfflineId === s.id}
-                      isInPlaylist={playlistIds.includes(s.id)}
-                      t={t}
-                      onPlay={(song) => void player.playSong(song)}
-                      onOpenLyrics={(song) => handleOpenSongLyrics(song)}
-                      onToggleOffline={(song) => void handleToggleOffline(song)}
-                      onTogglePlaylist={handleTogglePlaylist}
-                        isLiked={likedIds.includes(s.id)}
-                        onToggleLike={handleToggleLike}
-                      onOpenReport={(song) => {
-                        setReportTargetSong(song);
-                        setNoticeOpen(true);
-                      }}
-                    />
-                  ))}
+                {visibleChartSongs.map((s, idx) => (
+                  <SongRow
+                    key={s.id}
+                    song={s}
+                    rank={songRankMap.get(s.id) ?? idx + 1}
+                    isCurrent={player.currentSong?.id === s.id}
+                    isPlaying={player.isPlaying}
+                    isOffline={offlineIdSet.has(s.id)}
+                    isSavingOffline={savingOfflineId === s.id}
+                    isInPlaylist={playlistIdSet.has(s.id)}
+                    t={t}
+                    onPlay={handleRowPlay}
+                    onOpenLyrics={handleOpenSongLyrics}
+                    onToggleOffline={handleRowToggleOffline}
+                    onTogglePlaylist={handleTogglePlaylist}
+                    isLiked={likedIdSet.has(s.id)}
+                    onToggleLike={handleToggleLike}
+                    onOpenReport={handleRowOpenReport}
+                  />
+                ))}
               </div>
+              {visibleCount < chartFilteredSongs.length && (
+                <div ref={loadMoreRef} className="pt-3 pb-2 flex justify-center">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setVisibleCount((prev) =>
+                        Math.min(chartFilteredSongs.length, prev + PAGE_SIZE)
+                      )
+                    }
+                    className="px-4 py-2 rounded-full bg-[#F5F5F7] text-[#515154] text-xs font-bold active:bg-black/10 transition"
+                  >
+                    {visibleCount} / {chartFilteredSongs.length}
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
           {/* TAB 2.5: БАҚЫТ ҚАЙНАР (13 SONGS + LYRIC DECK) */}
           {tab === 'kaynar' && (
-            <BakhytKaynarView
-              lang={lang}
-              search={search}
-              songs={publishedSongs}
-              currentSong={player.currentSong}
-              isPlaying={player.isPlaying}
-              onPlaySong={(song) => {
-                setPreferredLyricsVersion('kaynar');
-                void player.playSong(song);
-              }}
-            />
+            <Suspense fallback={null}>
+              <BakhytKaynarView
+                lang={lang}
+                search={search}
+                songs={publishedSongs}
+                currentSong={player.currentSong}
+                isPlaying={player.isPlaying}
+                onPlaySong={(song) => {
+                  setPreferredLyricsVersion('kaynar');
+                  void player.playSong(song);
+                }}
+              />
+            </Suspense>
           )}
 
           {/* TAB 3: OFFLINE & LIBRARY (Opened from Settings) */}
@@ -1190,14 +1292,16 @@ export function App() {
                 <ArrowLeft className="w-4 h-4" />
                 <span>{t.tabSettings}</span>
               </button>
-              <UploadView
-                t={t}
-                isAdmin={isAdmin}
-                onUploaded={(newSong) => {
-                  setSongs((prev) => [newSong, ...prev]);
-                  void refreshOfflineStats();
-                }}
-              />
+              <Suspense fallback={null}>
+                <UploadView
+                  t={t}
+                  isAdmin={isAdmin}
+                  onUploaded={(newSong) => {
+                    setSongs((prev) => [newSong, ...prev]);
+                    void refreshOfflineStats();
+                  }}
+                />
+              </Suspense>
             </div>
           )}
 
@@ -1287,91 +1391,92 @@ export function App() {
 
           return (
             <div className="fixed inset-y-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] z-50 bg-gradient-to-b from-[#FFF5F6] via-white to-[#F5F5F7] flex flex-col px-3.5 pt-3 pb-4">
-              <LyricsView
-                lyrics={readerSong.lyrics ?? ''}
-                songKey={readerSong.song_key ?? readerKaynar?.songKey ?? null}
-                capo={readerSong.capo ?? readerKaynar?.capo ?? null}
-                kaynarSong={readerKaynar}
-                lang={lang}
-                defaultVersion={preferredLyricsVersion}
-                standardLabel={t.lyricsStandard}
-                kaynarLabel={t.tabKaynar}
-                title={readerSong.title}
-                author={readerAuthor}
-                gradient={getSongGradient(readerSong.id)}
-                currentTime={
-                  player.currentSong?.id === readerSong.id ? player.currentTime : 0
-                }
-                duration={
-                  player.currentSong?.id === readerSong.id ? player.duration : 0
-                }
-                isPlaying={isThisPlaying}
-                lyricsLabel={t.lyricsBtn}
-                onSeek={(sec) => {
-                  if (player.currentSong?.id === readerSong.id) {
-                    player.seekTo(sec);
+              <Suspense fallback={null}>
+                <LyricsView
+                  lyrics={readerSong.lyrics ?? ''}
+                  songKey={readerSong.song_key ?? readerKaynar?.songKey ?? null}
+                  capo={readerSong.capo ?? readerKaynar?.capo ?? null}
+                  kaynarSong={readerKaynar}
+                  lang={lang}
+                  defaultVersion={preferredLyricsVersion}
+                  standardLabel={t.lyricsStandard}
+                  kaynarLabel={t.tabKaynar}
+                  title={readerSong.title}
+                  author={readerAuthor}
+                  gradient={getSongGradient(readerSong.id)}
+                  currentTime={
+                    player.currentSong?.id === readerSong.id ? player.currentTime : 0
                   }
-                }}
-                onClose={() => setReaderSongId(null)}
-                hasAudio={readerHasAudio}
-                isSongAudioPlaying={isThisPlaying}
-                onToggleSongAudio={() => {
-                  if (!readerHasAudio) return;
-                  if (player.currentSong?.id === readerSong.id) {
-                    void player.togglePlay();
-                  } else {
-                    void player.playSong(readerSong);
+                  duration={
+                    player.currentSong?.id === readerSong.id ? player.duration : 0
                   }
-                }}
-                isInPlaylist={playlistIds.includes(readerSong.id)}
-                onTogglePlaylist={() => handleTogglePlaylist(readerSong)}
-                onPrevSong={
-                  activeList.length > 1 && prevReaderSong
-                    ? () => setReaderSongId(prevReaderSong.id)
-                    : undefined
-                }
-                onNextSong={
-                  activeList.length > 1 && nextReaderSong
-                    ? () => setReaderSongId(nextReaderSong.id)
-                    : undefined
-                }
-                songPositionLabel={
-                  rIdx >= 0 ? `${rIdx + 1} / ${activeList.length}` : undefined
-                }
-              />
+                  isPlaying={isThisPlaying}
+                  lyricsLabel={t.lyricsBtn}
+                  onSeek={(sec) => {
+                    if (player.currentSong?.id === readerSong.id) {
+                      player.seekTo(sec);
+                    }
+                  }}
+                  onClose={() => setReaderSongId(null)}
+                  hasAudio={readerHasAudio}
+                  isSongAudioPlaying={isThisPlaying}
+                  onToggleSongAudio={() => {
+                    if (!readerHasAudio) return;
+                    if (player.currentSong?.id === readerSong.id) {
+                      void player.togglePlay();
+                    } else {
+                      void player.playSong(readerSong);
+                    }
+                  }}
+                  isInPlaylist={playlistIdSet.has(readerSong.id)}
+                  onTogglePlaylist={() => handleTogglePlaylist(readerSong)}
+                  onPrevSong={
+                    activeList.length > 1 && prevReaderSong
+                      ? () => setReaderSongId(prevReaderSong.id)
+                      : undefined
+                  }
+                  onNextSong={
+                    activeList.length > 1 && nextReaderSong
+                      ? () => setReaderSongId(nextReaderSong.id)
+                      : undefined
+                  }
+                  songPositionLabel={
+                    rIdx >= 0 ? `${rIdx + 1} / ${activeList.length}` : undefined
+                  }
+                />
+              </Suspense>
             </div>
           );
         })()}
 
         {/* Slide-Up Full-Screen Now Playing Sheet */}
-        {player.currentSong && (
-          <FullPlayerSheet
-            isOpen={isFullPlayerOpen}
-            song={player.currentSong}
-            kaynarSong={KAYNAR_SONG_BY_AUDIO_ID.get(player.currentSong.id) ?? null}
-            lang={lang}
-            defaultLyricsVersion={preferredLyricsVersion}
-            isPlaying={player.isPlaying}
-            isOffline={offlineIds.includes(player.currentSong.id)}
-            isSavingOffline={savingOfflineId === player.currentSong.id}
-            currentTime={player.currentTime}
-            duration={player.duration}
-            repeatMode={player.repeatMode}
-            isShuffle={player.isShuffle}
-            t={t}
-            onClose={() => setIsFullPlayerOpen(false)}
-            onTogglePlay={() => void player.togglePlay()}
-            onPrev={player.playPrev}
-            onNext={() => player.playNext(false)}
-            onSeek={player.seekTo}
-            onCycleRepeat={player.cycleRepeat}
-            onToggleShuffle={player.toggleShuffle}
-            onToggleOffline={(song) => void handleToggleOffline(song)}
-            onOpenReport={(song) => {
-              setReportTargetSong(song);
-              setNoticeOpen(true);
-            }}
-          />
+        {player.currentSong && isFullPlayerOpen && (
+          <Suspense fallback={null}>
+            <FullPlayerSheet
+              isOpen={isFullPlayerOpen}
+              song={player.currentSong}
+              kaynarSong={KAYNAR_SONG_BY_AUDIO_ID.get(player.currentSong.id) ?? null}
+              lang={lang}
+              defaultLyricsVersion={preferredLyricsVersion}
+              isPlaying={player.isPlaying}
+              isOffline={offlineIdSet.has(player.currentSong.id)}
+              isSavingOffline={savingOfflineId === player.currentSong.id}
+              currentTime={player.currentTime}
+              duration={player.duration}
+              repeatMode={player.repeatMode}
+              isShuffle={player.isShuffle}
+              t={t}
+              onClose={() => setIsFullPlayerOpen(false)}
+              onTogglePlay={() => void player.togglePlay()}
+              onPrev={player.playPrev}
+              onNext={() => player.playNext(false)}
+              onSeek={player.seekTo}
+              onCycleRepeat={player.cycleRepeat}
+              onToggleShuffle={player.toggleShuffle}
+              onToggleOffline={handleRowToggleOffline}
+              onOpenReport={handleRowOpenReport}
+            />
+          </Suspense>
         )}
 
         {/* Settings Drawer */}
@@ -1399,37 +1504,39 @@ export function App() {
                   </button>
                 </div>
                 <div className="flex-1 overflow-y-auto px-4 py-4 pb-24">
-                  <SettingsAdminView
-                    t={t}
-                    session={session}
-                    isAdmin={isAdmin}
-                    localUserEmail={localUserEmail}
-                    offlineCount={offlineIds.length}
-                    offlineBytes={offlineBytes}
-                    songs={songs}
-                    showKaynarTab={showKaynarTab}
-                    onToggleKaynarTab={handleToggleKaynarTab}
-                    onClearOffline={handleClearOffline}
-                    onSessionChange={setSession}
-                    onLocalSignOut={() => {
-                      localStorage.removeItem('kwp_local_user_email');
-                      setLocalUserEmail(null);
-                    }}
-                    onRefreshSongs={refreshSongs}
-                    onOpenNotice={() => {
-                      setReportTargetSong(null);
-                      setNoticeOpen(true);
-                    }}
-                    onNavigateTab={(nextTab) => {
-                      setTab(nextTab);
-                      setIsSettingsOpen(false);
-                    }}
-                    onOpenFlipMode={() => {
-                      setIsSettingsOpen(false);
-                      setIsCoverMode(true);
-                    }}
-                    onResetWeeklyChart={handleResetWeeklyChart}
-                  />
+                  <Suspense fallback={null}>
+                    <SettingsAdminView
+                      t={t}
+                      session={session}
+                      isAdmin={isAdmin}
+                      localUserEmail={localUserEmail}
+                      offlineCount={offlineIds.length}
+                      offlineBytes={offlineBytes}
+                      songs={songs}
+                      showKaynarTab={showKaynarTab}
+                      onToggleKaynarTab={handleToggleKaynarTab}
+                      onClearOffline={handleClearOffline}
+                      onSessionChange={setSession}
+                      onLocalSignOut={() => {
+                        localStorage.removeItem('kwp_local_user_email');
+                        setLocalUserEmail(null);
+                      }}
+                      onRefreshSongs={refreshSongs}
+                      onOpenNotice={() => {
+                        setReportTargetSong(null);
+                        setNoticeOpen(true);
+                      }}
+                      onNavigateTab={(nextTab) => {
+                        setTab(nextTab);
+                        setIsSettingsOpen(false);
+                      }}
+                      onOpenFlipMode={() => {
+                        setIsSettingsOpen(false);
+                        setIsCoverMode(true);
+                      }}
+                      onResetWeeklyChart={handleResetWeeklyChart}
+                    />
+                  </Suspense>
                 </div>
               </aside>
             </div>
@@ -1437,36 +1544,44 @@ export function App() {
         )}
 
         {/* Copyright / Message Sheet */}
-        <NoticeReportSheet
-          isOpen={noticeOpen}
-          targetSong={reportTargetSong}
-          t={t}
-          onClose={() => setNoticeOpen(false)}
-        />
+        {noticeOpen && (
+          <Suspense fallback={null}>
+            <NoticeReportSheet
+              isOpen={noticeOpen}
+              targetSong={reportTargetSong}
+              t={t}
+              onClose={() => setNoticeOpen(false)}
+            />
+          </Suspense>
+        )}
 
         {/* Login Gate Modal (shown after listening 1 song) */}
-        <AuthModal
-          isOpen={isAuthModalOpen}
-          t={t}
-          onClose={() => setIsAuthModalOpen(false)}
-          onAuthenticated={(nextSession, localEmail) => {
-            isAuthenticatedRef.current = true;
-            if (nextSession) {
-              setSession(nextSession);
-            } else if (localEmail) {
-              localStorage.setItem('kwp_local_user_email', localEmail);
-              setLocalUserEmail(localEmail);
-            }
-            setIsAuthModalOpen(false);
-            const queued = pendingSongRef.current;
-            pendingSongRef.current = null;
-            if (queued) {
-              void player.playSong(queued);
-            } else {
-              player.playNext(false);
-            }
-          }}
-        />
+        {isAuthModalOpen && (
+          <Suspense fallback={null}>
+            <AuthModal
+              isOpen={isAuthModalOpen}
+              t={t}
+              onClose={() => setIsAuthModalOpen(false)}
+              onAuthenticated={(nextSession, localEmail) => {
+                isAuthenticatedRef.current = true;
+                if (nextSession) {
+                  setSession(nextSession);
+                } else if (localEmail) {
+                  localStorage.setItem('kwp_local_user_email', localEmail);
+                  setLocalUserEmail(localEmail);
+                }
+                setIsAuthModalOpen(false);
+                const queued = pendingSongRef.current;
+                pendingSongRef.current = null;
+                if (queued) {
+                  void player.playSong(queued);
+                } else {
+                  player.playNext(false);
+                }
+              }}
+            />
+          </Suspense>
+        )}
       </div>
     </div>
   );

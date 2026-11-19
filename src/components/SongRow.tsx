@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { BookOpen, Check, Download, Heart, Loader2, Music2, Pause, Play } from 'lucide-react';
 import type { TranslationStrings } from '../i18n/translations';
 import type { Song } from '../types';
@@ -35,7 +36,7 @@ interface SongRowProps {
   onOpenReport?: (song: Song) => void;
 }
 
-export function SongRow({
+export const SongRow = memo(function SongRow({
   song,
   rank,
   isCurrent,
@@ -184,4 +185,4 @@ export function SongRow({
       </div>
     </div>
   );
-}
+});

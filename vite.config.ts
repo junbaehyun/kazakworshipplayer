@@ -43,4 +43,14 @@ function localAudioProxyPlugin(): Plugin {
 
 export default defineConfig({
   plugins: [react(), tailwindcss(), localAudioProxyPlugin()],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'react-vendor': ['react', 'react-dom'],
+          supabase: ['@supabase/supabase-js'],
+        },
+      },
+    },
+  },
 });
