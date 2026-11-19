@@ -10,6 +10,8 @@ interface Stanza {
 
 interface LyricsViewProps {
   lyrics: string;
+  songKey?: string | null;
+  capo?: number | null;
   kaynarSong?: KaynarSong | null;
   lang: Language;
   defaultVersion?: 'standard' | 'kaynar';
@@ -31,6 +33,60 @@ const FONT_SIZE_CLASSES = [
   'text-[18px] leading-[1.65]',
   'text-[21px] leading-[1.7]',
 ] as const;
+
+const SHARP_SCALE = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+const FLAT_TO_SHARP: Record<string, string> = {
+  Db: 'C#',
+  Eb: 'D#',
+  Gb: 'F#',
+  Ab: 'G#',
+  Bb: 'A#',
+};
+
+function transposeNote(note: string, semitones: number): string {
+  if (!semitones) return note;
+  const normalized = FLAT_TO_SHARP[note] || note;
+  const idx = SHARP_SCALE.indexOf(normalized);
+  if (idx < 0) return note;
+  return SHARP_SCALE[(idx + semitones + 120) % 12];
+}
+
+function transposeChord(chord: string, semitones: number): string {
+  if (!semitones) return chord;
+  return chord.replace(/([A-G][#b]?)/g, (m) => transposeNote(m, semitones));
+}
+
+function stripChords(line: string): string {
+  return line.replace(/\[([^\]]+)\]/g, '');
+}
+
+function hasInlineChords(line: string): boolean {
+  return /\[([A-GH][^\]]*)\]/.test(line);
+}
+
+function parseChordedLine(
+  chorded: string,
+  semitones: number
+): Array<{ chord?: string; text: string }> {
+  const parts: Array<{ chord?: string; text: string }> = [];
+  const regex = /\[([^\]]+)\]([^\[]*)/g;
+  let lastIdx = 0;
+  let match: RegExpExecArray | null;
+  while ((match = regex.exec(chorded)) !== null) {
+    if (match.index > lastIdx) {
+      parts.push({ text: chorded.slice(lastIdx, match.index) });
+    }
+    parts.push({
+      chord: transposeChord(match[1].trim(), semitones),
+      text: match[2],
+    });
+    lastIdx = regex.lastIndex;
+  }
+  if (lastIdx < chorded.length) {
+    parts.push({ text: chorded.slice(lastIdx) });
+  }
+  return parts;
+}
 
 function parseStanzas(raw: string): Stanza[] {
   const trimmed = raw.trim();
@@ -57,8 +113,25 @@ function parseStanzas(raw: string): Stanza[] {
     .filter((s): s is Stanza => s !== null && s.lines.length > 0);
 }
 
+function formatSectionTag(tag: string, lang: Language): { label: string; isChorus: boolean } {
+  const lower = tag.toLowerCase();
+  const isChorus = lower.startsWith('қр') || lower === 'chorus' || lower === '후렴' || lower.startsWith('припев');
+  if (isChorus) {
+    return {
+      label: lang === 'ko' ? '후렴 (Қр.)' : 'Қр.',
+      isChorus: true,
+    };
+  }
+  if (/^\d+$/.test(tag) && lang === 'ko') {
+    return { label: `${tag}절`, isChorus: false };
+  }
+  return { label: tag, isChorus: false };
+}
+
 export function LyricsView({
   lyrics,
+  songKey = null,
+  capo = null,
   kaynarSong = null,
   lang,
   defaultVersion = 'standard',
@@ -76,6 +149,8 @@ export function LyricsView({
 }: LyricsViewProps) {
   const [fontStep, setFontStep] = useState<0 | 1 | 2>(1);
   const [copied, setCopied] = useState(false);
+  const [showChords, setShowChords] = useState(true);
+  const [transpose, setTranspose] = useState(0);
   const [version, setVersion] = useState<'standard' | 'kaynar'>(
     kaynarSong ? defaultVersion : 'standard'
   );
@@ -84,6 +159,7 @@ export function LyricsView({
 
   useEffect(() => {
     setVersion(kaynarSong ? defaultVersion : 'standard');
+    setTranspose(0);
   }, [kaynarSong, defaultVersion, title]);
 
   const activeVersion = kaynarSong ? version : 'standard';
@@ -91,6 +167,19 @@ export function LyricsView({
   const stanzas = useMemo(() => parseStanzas(lyrics), [lyrics]);
   const kaynarSections = useMemo(() => kaynarSong?.sections ?? [], [kaynarSong]);
   const totalBlocks = activeVersion === 'kaynar' ? kaynarSections.length : stanzas.length;
+
+  const standardHasChords = useMemo(
+    () => stanzas.some((s) => s.lines.some((l) => hasInlineChords(l))),
+    [stanzas]
+  );
+  const kaynarHasChords = useMemo(
+    () => kaynarSections.some((sec) => sec.lines.some((l) => Boolean(l.chords))),
+    [kaynarSections]
+  );
+  const activeHasChords =
+    activeVersion === 'kaynar' ? kaynarHasChords || standardHasChords : standardHasChords;
+  const activeKey = songKey || kaynarSong?.songKey || null;
+  const activeCapo = capo || kaynarSong?.capo || null;
 
   const activeIndex = useMemo(() => {
     if (totalBlocks <= 1 || duration <= 0) return 0;
@@ -111,14 +200,23 @@ export function LyricsView({
       return kaynarSong.sections
         .map((sec) => {
           const header = sec.label[lang === 'ko' ? 'ko' : 'kk'] || sec.label.kk || '';
-          const body = sec.lines.map((l) => l.kk).filter(Boolean).join('\n');
+          const body = sec.lines.map((l) => (showChords && l.chords ? l.chords : l.kk)).filter(Boolean).join('\n');
           return header ? `[${header}]\n${body}` : body;
         })
         .join('\n\n')
         .trim();
     }
-    return lyrics.trim();
-  }, [activeVersion, kaynarSong, lang, lyrics]);
+    return stanzas
+      .map((st) => {
+        const body = st.lines
+          .map((l) => (showChords ? l : stripChords(l)))
+          .filter(Boolean)
+          .join('\n');
+        return st.tag ? `[${st.tag}]\n${body}` : body;
+      })
+      .join('\n\n')
+      .trim();
+  }, [activeVersion, kaynarSong, lang, showChords, stanzas]);
 
   const handleCopy = async () => {
     if (!copyableText) return;
@@ -131,8 +229,17 @@ export function LyricsView({
     }
   };
 
+  const chordBtnLabel =
+    lang === 'ko'
+      ? '악보 코드'
+      : lang === 'kk'
+      ? 'Аккордтар'
+      : lang === 'ru'
+      ? 'Аккорды'
+      : 'Chords';
+
   return (
-    <div className="flex-1 min-h-0 my-3 bg-white/80 backdrop-blur-xl rounded-3xl border border-black/[0.06] shadow-[0_12px_36px_rgba(0,0,0,0.06)] flex flex-col overflow-hidden">
+    <div className="flex-1 min-h-0 my-3 bg-white/90 backdrop-blur-xl rounded-3xl border border-black/[0.06] shadow-[0_12px_36px_rgba(0,0,0,0.06)] flex flex-col overflow-hidden">
       {/* Compact Lyrics Header */}
       <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-black/[0.05] shrink-0">
         <div className="flex items-center gap-2.5 min-w-0">
@@ -220,7 +327,60 @@ export function LyricsView({
         </div>
       )}
 
-      {/* Scrollable Stanzas with Soft Edge Fade */}
+      {/* Worship Reader Basic Chords & Key Bar */}
+      {(activeHasChords || activeKey) && (
+        <div className="flex items-center justify-between gap-2 px-4 py-2 border-b border-[#FA243C]/15 bg-[#FFF8F6] shrink-0">
+          <div className="flex items-center gap-1.5 min-w-0">
+            {activeHasChords && (
+              <button
+                type="button"
+                onClick={() => setShowChords((v) => !v)}
+                className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold border transition ${
+                  showChords
+                    ? 'bg-[#1D1D1F] text-white border-[#1D1D1F]'
+                    : 'bg-white text-[#86868B] border-black/10'
+                }`}
+              >
+                {chordBtnLabel}
+              </button>
+            )}
+            {activeKey && (
+              <span className="rounded-md bg-white px-2 py-0.5 text-[11px] font-extrabold text-[#1D1D1F] border border-black/[0.06] truncate">
+                Key: {transposeChord(activeKey, transpose)}
+                {activeCapo ? ` (Capo ${activeCapo})` : ''}
+              </span>
+            )}
+          </div>
+
+          {activeHasChords && showChords && (
+            <div className="inline-flex items-center gap-1 shrink-0">
+              <button
+                type="button"
+                onClick={() => setTranspose((t) => Math.max(-6, t - 1))}
+                className="w-6 h-6 rounded-lg bg-white border border-black/[0.08] text-xs font-bold text-[#1D1D1F] active:scale-95"
+              >
+                -
+              </button>
+              <button
+                type="button"
+                onClick={() => setTranspose(0)}
+                className="px-1.5 h-6 rounded-lg bg-white border border-black/[0.08] text-[10px] font-bold text-[#515154]"
+              >
+                {transpose === 0 ? '0' : transpose > 0 ? `+${transpose}` : transpose}
+              </button>
+              <button
+                type="button"
+                onClick={() => setTranspose((t) => Math.min(6, t + 1))}
+                className="w-6 h-6 rounded-lg bg-white border border-black/[0.08] text-xs font-bold text-[#1D1D1F] active:scale-95"
+              >
+                +
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Worship Reader Stanza Cards */}
       <div
         onWheel={() => {
           lastManualScrollRef.current = Date.now();
@@ -228,13 +388,7 @@ export function LyricsView({
         onTouchMove={() => {
           lastManualScrollRef.current = Date.now();
         }}
-        style={{
-          maskImage:
-            'linear-gradient(to bottom, transparent 0%, black 6%, black 92%, transparent 100%)',
-          WebkitMaskImage:
-            'linear-gradient(to bottom, transparent 0%, black 6%, black 92%, transparent 100%)',
-        }}
-        className="flex-1 overflow-y-auto px-5 py-6 space-y-6"
+        className="flex-1 overflow-y-auto px-3.5 py-3.5 space-y-3"
       >
         {activeVersion === 'kaynar' && kaynarSong ? (
           kaynarSections.length === 0 ? (
@@ -243,7 +397,8 @@ export function LyricsView({
             kaynarSections.map((sec, idx) => {
               const isActive = idx === activeIndex;
               const targetTime = duration > 0 ? (idx / kaynarSections.length) * duration : 0;
-              const secTag = sec.label[lang === 'ko' ? 'ko' : 'kk'] || sec.label.kk || sec.label.ko;
+              const rawTag = sec.label[lang === 'ko' ? 'ko' : 'kk'] || sec.label.kk || sec.label.ko;
+              const isChorus = sec.kind === 'chorus';
 
               return (
                 <button
@@ -255,36 +410,67 @@ export function LyricsView({
                   onClick={() => {
                     if (duration > 0) onSeek(targetTime);
                   }}
-                  className={`w-full text-left rounded-2xl px-3 py-2 transition-all duration-300 ${
+                  className={`w-full text-left rounded-2xl border overflow-hidden transition-all duration-300 ${
                     isActive
-                      ? 'bg-[#FA243C]/[0.06] text-[#1D1D1F] opacity-100'
-                      : 'text-[#1D1D1F]/45 hover:text-[#1D1D1F]/75'
+                      ? 'border-[#FA243C]/35 bg-[#FFF8F6]/70 shadow-xs'
+                      : 'border-black/[0.06] bg-white'
                   }`}
                 >
-                  {secTag && (
-                    <span className="inline-block mb-1.5 px-2.5 py-0.5 rounded-full bg-[#FA243C]/12 text-[#FA243C] text-[10px] font-extrabold uppercase tracking-wider">
-                      {secTag}
-                    </span>
+                  {rawTag && (
+                    <div className="bg-[#F5F5F7]/80 px-3.5 py-1.5 border-b border-black/[0.04] flex items-center justify-between">
+                      <span
+                        className={`inline-flex rounded-md px-2 py-0.5 text-[10px] font-extrabold ${
+                          isChorus
+                            ? 'bg-[#1D1D1F] text-white'
+                            : 'bg-[#FA243C]/12 text-[#FA243C]'
+                        }`}
+                      >
+                        {rawTag}
+                      </span>
+                    </div>
                   )}
-                  <div className="space-y-2.5">
-                    {sec.lines.map((line, lineIdx) => (
-                      <div key={lineIdx} className="space-y-0.5">
-                        <p className={`font-bold tracking-[-0.01em] ${FONT_SIZE_CLASSES[fontStep]}`}>
-                          {line.kk}
-                        </p>
-                        {lang === 'ko' && line.reading && (
-                          <p className="text-xs font-medium text-[#FA243C]/85">{line.reading}</p>
-                        )}
-                        {lang === 'ko' && (line.koHymn || line.meaning) && (
-                          <p className="text-xs font-medium text-[#6E6E73]">
-                            {line.koHymn || line.meaning}
-                          </p>
-                        )}
-                        {lang === 'en' && line.en && (
-                          <p className="text-xs font-medium text-[#6E6E73]">{line.en}</p>
-                        )}
-                      </div>
-                    ))}
+                  <div className="divide-y divide-black/[0.04]">
+                    {sec.lines.map((line, lineIdx) => {
+                      const chordSegments =
+                        showChords && line.chords ? parseChordedLine(line.chords, transpose) : null;
+                      return (
+                        <div key={lineIdx} className="px-3.5 py-2.5 space-y-1">
+                          {chordSegments ? (
+                            <div
+                              className={`flex flex-wrap items-end leading-snug text-[#1D1D1F] ${FONT_SIZE_CLASSES[fontStep]}`}
+                            >
+                              {chordSegments.map((seg, sIdx) => (
+                                <span
+                                  key={sIdx}
+                                  className="inline-flex flex-col items-start whitespace-pre-wrap"
+                                >
+                                  <span className="text-[11px] font-extrabold font-mono text-[#FA243C] leading-none mb-1 min-h-[12px]">
+                                    {seg.chord || '\u00A0'}
+                                  </span>
+                                  <span className="font-bold">{seg.text || '\u00A0'}</span>
+                                </span>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className={`font-bold text-[#1D1D1F] ${FONT_SIZE_CLASSES[fontStep]}`}>
+                              {line.kk}
+                            </p>
+                          )}
+                          {lang === 'ko' && line.reading && (
+                            <p className="text-xs font-medium text-sky-700">{line.reading}</p>
+                          )}
+                          {lang === 'ko' && line.meaning && (
+                            <p className="text-xs text-[#6E6E73]">{line.meaning}</p>
+                          )}
+                          {lang === 'ko' && line.koHymn && (
+                            <p className="text-xs font-semibold text-violet-700">{line.koHymn}</p>
+                          )}
+                          {lang === 'en' && line.en && (
+                            <p className="text-xs font-medium italic text-emerald-700">{line.en}</p>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 </button>
               );
@@ -296,6 +482,7 @@ export function LyricsView({
           stanzas.map((stanza, idx) => {
             const isActive = idx === activeIndex;
             const targetTime = duration > 0 ? (idx / stanzas.length) * duration : 0;
+            const tagInfo = stanza.tag ? formatSectionTag(stanza.tag, lang) : null;
 
             return (
               <button
@@ -307,21 +494,61 @@ export function LyricsView({
                 onClick={() => {
                   if (duration > 0) onSeek(targetTime);
                 }}
-                className={`w-full text-left rounded-2xl px-3 py-2 transition-all duration-300 ${
+                className={`w-full text-left rounded-2xl border overflow-hidden transition-all duration-300 ${
                   isActive
-                    ? 'bg-[#FA243C]/[0.06] text-[#1D1D1F] opacity-100'
-                    : 'text-[#1D1D1F]/40 hover:text-[#1D1D1F]/70'
+                    ? 'border-[#FA243C]/35 bg-[#FFF8F6]/70 shadow-xs'
+                    : 'border-black/[0.06] bg-white'
                 }`}
               >
-                {stanza.tag && (
-                  <span className="inline-block mb-1.5 px-2.5 py-0.5 rounded-full bg-[#FA243C]/12 text-[#FA243C] text-[10px] font-extrabold uppercase tracking-wider">
-                    {stanza.tag}
-                  </span>
+                {tagInfo && (
+                  <div className="bg-[#F5F5F7]/80 px-3.5 py-1.5 border-b border-black/[0.04] flex items-center justify-between">
+                    <span
+                      className={`inline-flex rounded-md px-2 py-0.5 text-[10px] font-extrabold ${
+                        tagInfo.isChorus
+                          ? 'bg-[#1D1D1F] text-white'
+                          : 'bg-[#FA243C]/12 text-[#FA243C]'
+                      }`}
+                    >
+                      {tagInfo.label}
+                    </span>
+                  </div>
                 )}
-                <div className={`font-bold tracking-[-0.01em] space-y-1 ${FONT_SIZE_CLASSES[fontStep]}`}>
-                  {stanza.lines.map((line, lineIdx) => (
-                    <p key={lineIdx}>{line}</p>
-                  ))}
+                <div className="divide-y divide-black/[0.04]">
+                  {stanza.lines.map((line, lineIdx) => {
+                    const lineHasChords = showChords && hasInlineChords(line);
+                    const chordSegments = lineHasChords
+                      ? parseChordedLine(line, transpose)
+                      : null;
+                    const plainLine = stripChords(line);
+
+                    return (
+                      <div key={lineIdx} className="px-3.5 py-2.5">
+                        {chordSegments ? (
+                          <div
+                            className={`flex flex-wrap items-end leading-snug text-[#1D1D1F] ${FONT_SIZE_CLASSES[fontStep]}`}
+                          >
+                            {chordSegments.map((seg, sIdx) => (
+                              <span
+                                key={sIdx}
+                                className="inline-flex flex-col items-start whitespace-pre-wrap"
+                              >
+                                <span className="text-[11px] font-extrabold font-mono text-[#FA243C] leading-none mb-1 min-h-[12px]">
+                                  {seg.chord || '\u00A0'}
+                                </span>
+                                <span className="font-bold">{seg.text || '\u00A0'}</span>
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <p
+                            className={`font-bold tracking-[-0.01em] text-[#1D1D1F] ${FONT_SIZE_CLASSES[fontStep]}`}
+                          >
+                            {plainLine}
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </button>
             );

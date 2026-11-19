@@ -231,7 +231,7 @@ export function App() {
       return (
         s.title.toLowerCase().includes(q) ||
         s.artist.toLowerCase().includes(q) ||
-        (s.lyrics && s.lyrics.toLowerCase().includes(q)) ||
+        (s.lyrics && s.lyrics.replace(/\[[^\]]+\]/g, '').toLowerCase().includes(q)) ||
         Boolean(kaynarTitleMatch)
       );
     });

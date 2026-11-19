@@ -16,6 +16,8 @@ export interface Song {
   storage_path?: string | null;
   duration_seconds: number;
   lyrics?: string | null;
+  song_key?: string | null;
+  capo?: number | null;
   play_count: number;
   uploaded_by: string;
   status: SongStatus;

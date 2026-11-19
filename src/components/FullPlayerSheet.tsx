@@ -122,6 +122,8 @@ export function FullPlayerSheet({
       ) : (
         <LyricsView
           lyrics={song.lyrics ?? ''}
+          songKey={song.song_key ?? kaynarSong?.songKey ?? null}
+          capo={song.capo ?? kaynarSong?.capo ?? null}
           kaynarSong={kaynarSong}
           lang={lang}
           defaultVersion={defaultLyricsVersion}
