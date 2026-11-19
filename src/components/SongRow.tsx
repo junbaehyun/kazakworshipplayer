@@ -52,6 +52,7 @@ export function SongRow({
 }: SongRowProps) {
   const authorLabel = song.is_unknown_author ? t.unknownAuthor : song.artist;
   const gradient = getSongGradient(song.id);
+  const hasAudio = Boolean(song.audio_url && song.audio_url.trim());
 
   return (
     <div
@@ -60,7 +61,10 @@ export function SongRow({
     >
       <button
         type="button"
-        onClick={() => onPlay(song)}
+        onClick={() => {
+          if (hasAudio) onPlay(song);
+          else onOpenLyrics?.(song);
+        }}
         className="flex items-center gap-3 min-w-0 flex-1 text-left active:opacity-75 transition"
       >
         {typeof rank === 'number' && (
@@ -76,7 +80,9 @@ export function SongRow({
         <div
           className={`w-11 h-11 rounded-xl bg-gradient-to-br ${gradient} flex items-center justify-center text-white shadow-xs shrink-0`}
         >
-          {isCurrent && isPlaying ? (
+          {!hasAudio ? (
+            <BookOpen className="w-4 h-4" />
+          ) : isCurrent && isPlaying ? (
             <Pause className="w-4 h-4 fill-white" />
           ) : isCurrent ? (
             <Play className="w-4 h-4 fill-white ml-0.5" />
@@ -95,9 +101,20 @@ export function SongRow({
           </p>
           <div className="flex items-center gap-1.5 min-w-0">
             <p className="text-xs text-[#86868B] truncate">
-              {authorLabel} · ▶ {song.play_count.toLocaleString()} {t.plays}
+              {authorLabel}
+              {hasAudio ? ` · ▶ ${song.play_count.toLocaleString()} ${t.plays}` : ''}
             </p>
-            {isOffline && (
+            {song.song_key && (
+              <span className="px-1.5 py-0.5 rounded-md bg-[#F5F5F7] text-[#1D1D1F] text-[9px] font-extrabold border border-black/[0.05] shrink-0">
+                {song.song_key}
+              </span>
+            )}
+            {!hasAudio && (
+              <span className="px-1.5 py-0.5 rounded-md bg-black/[0.06] text-[#515154] text-[9px] font-bold shrink-0">
+                {t.lyricsBtn}
+              </span>
+            )}
+            {isOffline && hasAudio && (
               <span className="px-1.5 py-0.5 rounded-md bg-[#34C759]/12 text-[#34C759] text-[9px] font-bold shrink-0">
                 ✓ {t.tabOffline}
               </span>
@@ -124,7 +141,7 @@ export function SongRow({
           </button>
         )}
 
-        {onToggleOffline && (
+        {onToggleOffline && hasAudio && (
           <button
             type="button"
             disabled={isSavingOffline}

@@ -13,6 +13,7 @@ import {
   Play,
   Search,
   Settings,
+  Share2,
   Shuffle,
   Smartphone,
   Trash2,
@@ -25,10 +26,11 @@ import { BakhytKaynarView } from './components/BakhytKaynarView';
 import { FlipCoverView } from './components/FlipCoverView';
 import { FullPlayerSheet } from './components/FullPlayerSheet';
 import { InstallPromptBanner } from './components/InstallPromptBanner';
+import { LyricsView } from './components/LyricsView';
 import { MiniPlayer } from './components/MiniPlayer';
 import { NoticeReportSheet } from './components/NoticeReportSheet';
 import { SettingsAdminView } from './components/SettingsAdminView';
-import { SongRow } from './components/SongRow';
+import { getSongGradient, SongRow } from './components/SongRow';
 import { UploadView } from './components/UploadView';
 import {
   BAKHYT_KAYNAR_AUDIO_MAP,
@@ -54,6 +56,7 @@ const LIKED_KEY = 'kwp_liked_ids_v1';
 const DEV_KAYNAR_KEY = 'kwp_dev_show_kaynar';
 
 type ListenFilter = 'all' | 'kaynar' | 'playlist' | 'offline';
+const GUITAR_KEYS = ['all', 'C', 'D', 'Dm', 'E', 'Em', 'F', 'G', 'A', 'Am', 'Bm', 'Bb'] as const;
 
 const KAYNAR_BY_ID = new Map<string, KaynarSong>(bakhytKaynarSongs.map((s) => [s.id, s]));
 const KAYNAR_SONG_BY_AUDIO_ID = new Map<string, KaynarSong>();
@@ -132,8 +135,10 @@ export function App() {
   });
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [listenFilter, setListenFilter] = useState<ListenFilter>('all');
+  const [selectedKey, setSelectedKey] = useState<string>('all');
+  const [readerSongId, setReaderSongId] = useState<string | null>(null);
+  const [copiedSetlist, setCopiedSetlist] = useState(false);
   const [preferredLyricsVersion, setPreferredLyricsVersion] = useState<'standard' | 'kaynar'>('standard');
-  const [openLyricsSignal, setOpenLyricsSignal] = useState(0);
   const [isCoverMode, setIsCoverMode] = useState<boolean>(() => isFlipCoverViewport());
   const manualCoverExitRef = useRef(false);
   const wakeLock = useWakeLock(true);
@@ -304,28 +309,47 @@ export function App() {
   );
 
   const listenSongs = useMemo(() => {
+    let base: Song[];
     if (listenFilter === 'kaynar') {
-      return filteredSongs.filter((s) => KAYNAR_AUDIO_IDS.has(s.id));
-    }
-    if (listenFilter === 'playlist') {
+      base = filteredSongs.filter((s) => KAYNAR_AUDIO_IDS.has(s.id));
+    } else if (listenFilter === 'playlist') {
       const q = search.trim().toLowerCase();
-      if (!q) return playlistSongs;
-      return playlistSongs.filter(
-        (s) =>
-          s.title.toLowerCase().includes(q) ||
-          s.artist.toLowerCase().includes(q) ||
-          (s.lyrics && s.lyrics.toLowerCase().includes(q))
-      );
+      base = !q
+        ? playlistSongs
+        : playlistSongs.filter(
+            (s) =>
+              s.title.toLowerCase().includes(q) ||
+              s.artist.toLowerCase().includes(q) ||
+              (s.lyrics && s.lyrics.replace(/\[[^\]]+\]/g, '').toLowerCase().includes(q))
+          );
+    } else if (listenFilter === 'offline') {
+      base = filteredSongs.filter((s) => offlineIds.includes(s.id));
+    } else {
+      base = filteredSongs;
     }
-    if (listenFilter === 'offline') {
-      return filteredSongs.filter((s) => offlineIds.includes(s.id));
+
+    if (selectedKey !== 'all') {
+      return base.filter((s) => {
+        const k = s.song_key ?? KAYNAR_SONG_BY_AUDIO_ID.get(s.id)?.songKey ?? '';
+        return k.toLowerCase() === selectedKey.toLowerCase();
+      });
     }
-    return filteredSongs;
-  }, [filteredSongs, listenFilter, offlineIds, playlistSongs, search]);
+    return base;
+  }, [filteredSongs, listenFilter, offlineIds, playlistSongs, search, selectedKey]);
+
+  const playableListenSongs = useMemo(
+    () => listenSongs.filter((s) => Boolean(s.audio_url && s.audio_url.trim())),
+    [listenSongs]
+  );
+
+  const playableTopChartSongs = useMemo(
+    () => topChartSongs.filter((s) => Boolean(s.audio_url && s.audio_url.trim())),
+    [topChartSongs]
+  );
 
   const libraryQueue = useMemo(
-    () => (listenSongs.length > 0 ? listenSongs : topChartSongs),
-    [listenSongs, topChartSongs]
+    () => (playableListenSongs.length > 0 ? playableListenSongs : playableTopChartSongs),
+    [playableListenSongs, playableTopChartSongs]
   );
 
   const handleBeforePlay = useCallback(
@@ -380,14 +404,39 @@ export function App() {
   const handleOpenSongLyrics = useCallback(
     (song: Song, version?: 'standard' | 'kaynar') => {
       setPreferredLyricsVersion(version ?? (listenFilter === 'kaynar' ? 'kaynar' : 'standard'));
-      if (player.currentSong?.id !== song.id) {
-        void player.playSong(song);
-      }
-      setOpenLyricsSignal((n) => n + 1);
-      setIsFullPlayerOpen(true);
+      setReaderSongId(song.id);
     },
-    [listenFilter, player]
+    [listenFilter]
   );
+
+  const handleShareSetlistLyrics = useCallback(async () => {
+    if (playlistSongs.length === 0) return;
+    const text = playlistSongs
+      .map((s, idx) => {
+        const keyStr = s.song_key ? ` [Key: ${s.song_key}]` : '';
+        const cleanBody = (s.lyrics || '').replace(/\[([A-GH][^\]]*)\]/g, '');
+        return `${idx + 1}. ${s.title}${keyStr}\n${cleanBody}`;
+      })
+      .join('\n\n────────────────────\n\n');
+    try {
+      if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
+        await navigator.share({
+          title: t.myPlaylistTitle,
+          text,
+        });
+        return;
+      }
+    } catch {
+      // Fallback to clipboard if share cancelled or unsupported
+    }
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedSetlist(true);
+      window.setTimeout(() => setCopiedSetlist(false), 2000);
+    } catch {
+      // Ignore clipboard error
+    }
+  }, [playlistSongs, t.myPlaylistTitle]);
 
   useEffect(() => {
     if (hasAutoLoadedRef.current || libraryQueue.length === 0 || player.currentSong) return;
@@ -418,7 +467,9 @@ export function App() {
       cancelBatchOfflineRef.current = true;
       return;
     }
-    const missing = targetSongs.filter((s) => !offlineIds.includes(s.id));
+    const missing = targetSongs.filter(
+      (s) => Boolean(s.audio_url && s.audio_url.trim()) && !offlineIds.includes(s.id)
+    );
     if (missing.length === 0) return;
 
     cancelBatchOfflineRef.current = false;
@@ -495,7 +546,7 @@ export function App() {
           duration={player.duration}
           repeatMode={player.repeatMode}
           isShuffle={player.isShuffle}
-          allSongs={topChartSongs}
+          allSongs={playableTopChartSongs}
           kaynarAudioIds={KAYNAR_AUDIO_IDS}
           playlistIds={playlistIds}
           wakeLockEnabled={wakeLock.enabled}
@@ -666,33 +717,79 @@ export function App() {
                 })}
               </div>
 
+              {/* Guitar Key Filter Bar */}
+              <div className="flex items-center gap-1 overflow-x-auto no-scrollbar pb-0.5">
+                {GUITAR_KEYS.map((k) => {
+                  const active = selectedKey === k;
+                  return (
+                    <button
+                      key={k}
+                      type="button"
+                      onClick={() => setSelectedKey(k)}
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-extrabold whitespace-nowrap transition shrink-0 ${
+                        active
+                          ? 'bg-[#1D1D1F] text-white'
+                          : 'bg-[#F5F5F7] text-[#515154] active:bg-black/10'
+                      }`}
+                    >
+                      {k === 'all' ? 'Key: All' : k}
+                    </button>
+                  );
+                })}
+              </div>
+
               {/* Play / Shuffle / Add All Action Bar */}
               {listenSongs.length > 0 && (
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
+                    disabled={playableListenSongs.length === 0}
                     onClick={() => {
                       setPreferredLyricsVersion(listenFilter === 'kaynar' ? 'kaynar' : 'standard');
-                      if (listenSongs[0]) void player.playSong(listenSongs[0]);
+                      if (playableListenSongs[0]) void player.playSong(playableListenSongs[0]);
                     }}
-                    className="flex-1 py-2.5 rounded-xl bg-[#FA243C] text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs active:opacity-85 transition"
+                    className="flex-1 py-2.5 rounded-xl bg-[#FA243C] text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs active:opacity-85 transition disabled:opacity-40"
                   >
                     <Play className="w-3.5 h-3.5 fill-white" />
                     <span>{t.playBtn}</span>
                   </button>
                   <button
                     type="button"
+                    disabled={playableListenSongs.length === 0}
                     onClick={() => {
                       setPreferredLyricsVersion(listenFilter === 'kaynar' ? 'kaynar' : 'standard');
                       if (!player.isShuffle) player.toggleShuffle();
-                      const pick = listenSongs[Math.floor(Math.random() * listenSongs.length)];
+                      const pick =
+                        playableListenSongs[
+                          Math.floor(Math.random() * playableListenSongs.length)
+                        ];
                       if (pick) void player.playSong(pick);
                     }}
-                    className="flex-1 py-2.5 rounded-xl bg-[#F5F5F7] text-[#FA243C] text-xs font-bold flex items-center justify-center gap-1.5 active:bg-black/10 transition"
+                    className="flex-1 py-2.5 rounded-xl bg-[#F5F5F7] text-[#FA243C] text-xs font-bold flex items-center justify-center gap-1.5 active:bg-black/10 transition disabled:opacity-40"
                   >
                     <Shuffle className="w-3.5 h-3.5" />
                     <span>{t.shuffleBtn}</span>
                   </button>
+                  {listenFilter === 'playlist' && playlistSongs.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => void handleShareSetlistLyrics()}
+                      className="px-3 py-2.5 rounded-xl bg-[#F5F5F7] text-[#1D1D1F] text-xs font-bold flex items-center justify-center gap-1 shrink-0 active:bg-black/10 transition"
+                    >
+                      {copiedSetlist ? (
+                        <Check className="w-3.5 h-3.5 text-[#34C759]" />
+                      ) : (
+                        <Share2 className="w-3.5 h-3.5 text-[#FA243C]" />
+                      )}
+                      <span>
+                        {copiedSetlist
+                          ? t.addedAllToPlaylist
+                          : lang === 'ko'
+                          ? '가사 공유'
+                          : 'Share'}
+                      </span>
+                    </button>
+                  )}
                   {listenFilter !== 'playlist' && listenFilter !== 'offline' && (() => {
                     const allInPlaylist = listenSongs.every((s) => playlistIds.includes(s.id));
                     return (
@@ -1195,6 +1292,88 @@ export function App() {
           </nav>
         )}
 
+        {/* Silent Full-Screen Lyrics & Chords Songbook Reader */}
+        {readerSongId && (() => {
+          const readerSong = publishedSongs.find((s) => s.id === readerSongId);
+          if (!readerSong) return null;
+          const activeList = listenSongs.some((s) => s.id === readerSong.id)
+            ? listenSongs
+            : topChartSongs;
+          const rIdx = activeList.findIndex((s) => s.id === readerSong.id);
+          const prevReaderSong =
+            rIdx > 0 ? activeList[rIdx - 1] : activeList[activeList.length - 1];
+          const nextReaderSong =
+            rIdx >= 0 && rIdx < activeList.length - 1
+              ? activeList[rIdx + 1]
+              : activeList[0];
+          const readerKaynar = KAYNAR_SONG_BY_AUDIO_ID.get(readerSong.id) ?? null;
+          const readerAuthor = readerSong.is_unknown_author
+            ? t.unknownAuthor
+            : readerSong.artist;
+          const readerHasAudio = Boolean(
+            readerSong.audio_url && readerSong.audio_url.trim()
+          );
+          const isThisPlaying =
+            player.currentSong?.id === readerSong.id && player.isPlaying;
+
+          return (
+            <div className="fixed inset-y-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] z-50 bg-gradient-to-b from-[#FFF5F6] via-white to-[#F5F5F7] flex flex-col px-3.5 pt-3 pb-4">
+              <LyricsView
+                lyrics={readerSong.lyrics ?? ''}
+                songKey={readerSong.song_key ?? readerKaynar?.songKey ?? null}
+                capo={readerSong.capo ?? readerKaynar?.capo ?? null}
+                kaynarSong={readerKaynar}
+                lang={lang}
+                defaultVersion={preferredLyricsVersion}
+                standardLabel={t.lyricsStandard}
+                kaynarLabel={t.tabKaynar}
+                title={readerSong.title}
+                author={readerAuthor}
+                gradient={getSongGradient(readerSong.id)}
+                currentTime={
+                  player.currentSong?.id === readerSong.id ? player.currentTime : 0
+                }
+                duration={
+                  player.currentSong?.id === readerSong.id ? player.duration : 0
+                }
+                isPlaying={isThisPlaying}
+                lyricsLabel={t.lyricsBtn}
+                onSeek={(sec) => {
+                  if (player.currentSong?.id === readerSong.id) {
+                    player.seekTo(sec);
+                  }
+                }}
+                onClose={() => setReaderSongId(null)}
+                hasAudio={readerHasAudio}
+                isSongAudioPlaying={isThisPlaying}
+                onToggleSongAudio={() => {
+                  if (!readerHasAudio) return;
+                  if (player.currentSong?.id === readerSong.id) {
+                    void player.togglePlay();
+                  } else {
+                    void player.playSong(readerSong);
+                  }
+                }}
+                isInPlaylist={playlistIds.includes(readerSong.id)}
+                onTogglePlaylist={() => handleTogglePlaylist(readerSong)}
+                onPrevSong={
+                  activeList.length > 1 && prevReaderSong
+                    ? () => setReaderSongId(prevReaderSong.id)
+                    : undefined
+                }
+                onNextSong={
+                  activeList.length > 1 && nextReaderSong
+                    ? () => setReaderSongId(nextReaderSong.id)
+                    : undefined
+                }
+                songPositionLabel={
+                  rIdx >= 0 ? `${rIdx + 1} / ${activeList.length}` : undefined
+                }
+              />
+            </div>
+          );
+        })()}
+
         {/* Slide-Up Full-Screen Now Playing Sheet */}
         {player.currentSong && (
           <FullPlayerSheet
@@ -1203,7 +1382,6 @@ export function App() {
             kaynarSong={KAYNAR_SONG_BY_AUDIO_ID.get(player.currentSong.id) ?? null}
             lang={lang}
             defaultLyricsVersion={preferredLyricsVersion}
-            openLyricsSignal={openLyricsSignal}
             isPlaying={player.isPlaying}
             isOffline={offlineIds.includes(player.currentSong.id)}
             isSavingOffline={savingOfflineId === player.currentSong.id}
