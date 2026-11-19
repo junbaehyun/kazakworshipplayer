@@ -4,7 +4,7 @@ import type { Song, SongReport } from '../types';
 const DB_NAME = 'kwp_offline_db';
 const DB_VERSION = 1;
 const BLOB_STORE = 'offline_blobs';
-const SONGS_KEY = 'kwp_local_songs_v51';
+const SONGS_KEY = 'kwp_local_songs_v52';
 const WEEKLY_RESET_KEY = 'kwp_weekly_chart_reset_at';
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 const REPORTS_KEY = 'kwp_local_reports_v1';
