@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { BookOpen, Check, ChevronRight, CloudUpload, Code2, Download, HardDrive, LogOut, Mail, RotateCcw, ShieldCheck, Trash2, Trophy } from 'lucide-react';
+import { BookOpen, Check, ChevronRight, CloudUpload, Code2, Download, HardDrive, LogOut, Mail, RotateCcw, ShieldCheck, Smartphone, Trash2, Trophy } from 'lucide-react';
 import type { Session } from '@supabase/supabase-js';
 import type { TranslationStrings } from '../i18n/translations';
 import {
@@ -29,6 +29,7 @@ interface SettingsAdminViewProps {
   onRefreshSongs: () => Promise<void>;
   onOpenNotice: () => void;
   onNavigateTab: (tab: 'chart' | 'offline' | 'upload') => void;
+  onOpenFlipMode: () => void;
   onResetWeeklyChart: () => void;
 }
 
@@ -48,6 +49,7 @@ export function SettingsAdminView({
   onRefreshSongs,
   onOpenNotice,
   onNavigateTab,
+  onOpenFlipMode,
   onResetWeeklyChart,
 }: SettingsAdminViewProps) {
   const [email, setEmail] = useState('junbaehyun.kz@gmail.com');
@@ -140,6 +142,23 @@ export function SettingsAdminView({
             <div className="min-w-0">
               <p className="text-xs font-bold text-[#1D1D1F]">{t.tabOffline}</p>
               <p className="text-[11px] text-[#86868B]">{offlineCount} MP3 · {sizeMb} MB</p>
+            </div>
+          </div>
+          <ChevronRight className="w-4 h-4 text-[#86868B] shrink-0" />
+        </button>
+
+        <button
+          type="button"
+          onClick={onOpenFlipMode}
+          className="w-full px-4 py-3 flex items-center justify-between text-left active:bg-black/5 transition"
+        >
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="w-8 h-8 rounded-xl bg-[#AF52DE]/12 text-[#AF52DE] flex items-center justify-center shrink-0">
+              <Smartphone className="w-4 h-4" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-xs font-bold text-[#1D1D1F]">Galaxy Z Flip Cover Mode</p>
+              <p className="text-[11px] text-[#86868B]">Beta · Cover screen layout & Wake Lock</p>
             </div>
           </div>
           <ChevronRight className="w-4 h-4 text-[#86868B] shrink-0" />

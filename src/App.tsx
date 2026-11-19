@@ -15,7 +15,6 @@ import {
   Settings,
   Share2,
   Shuffle,
-  Smartphone,
   Trash2,
   Wifi,
   WifiOff,
@@ -69,15 +68,6 @@ for (const [kaynarId, audioSongId] of Object.entries(BAKHYT_KAYNAR_AUDIO_MAP)) {
   }
 }
 const KAYNAR_AUDIO_IDS = new Set<string>(Object.values(BAKHYT_KAYNAR_AUDIO_MAP));
-
-function isFlipCoverViewport(): boolean {
-  if (typeof window === 'undefined') return false;
-  const w = window.innerWidth;
-  const h = window.innerHeight;
-  if (w <= 0 || h <= 0) return false;
-  const ratio = w / h;
-  return (h <= 560 && w <= 760) || (w <= 760 && h <= 780 && ratio >= 0.78 && ratio <= 1.35);
-}
 
 export function App() {
   const [lang, setLang] = useState<Language>(() => {
@@ -139,8 +129,7 @@ export function App() {
   const [readerSongId, setReaderSongId] = useState<string | null>(null);
   const [copiedSetlist, setCopiedSetlist] = useState(false);
   const [preferredLyricsVersion, setPreferredLyricsVersion] = useState<'standard' | 'kaynar'>('standard');
-  const [isCoverMode, setIsCoverMode] = useState<boolean>(() => isFlipCoverViewport());
-  const manualCoverExitRef = useRef(false);
+  const [isCoverMode, setIsCoverMode] = useState<boolean>(false);
   const wakeLock = useWakeLock(true);
   const pendingSongRef = useRef<Song | null>(null);
   const pendingPromptOnVisibleRef = useRef(false);
@@ -204,19 +193,6 @@ export function App() {
       window.removeEventListener('online', onOnline);
       window.removeEventListener('offline', onOffline);
     };
-  }, []);
-
-  useEffect(() => {
-    const onResize = () => {
-      const isCompactSquare = isFlipCoverViewport();
-      if (isCompactSquare && !manualCoverExitRef.current) {
-        setIsCoverMode(true);
-      } else if (!isCompactSquare) {
-        manualCoverExitRef.current = false;
-      }
-    };
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
   }, []);
 
   const handlePlayCountUpdated = useCallback((songId: string, newCount: number) => {
@@ -552,10 +528,7 @@ export function App() {
           wakeLockEnabled={wakeLock.enabled}
           wakeLockLocked={wakeLock.isLocked}
           onToggleWakeLock={wakeLock.toggleWakeLock}
-          onExitCoverMode={() => {
-            manualCoverExitRef.current = true;
-            setIsCoverMode(false);
-          }}
+          onExitCoverMode={() => setIsCoverMode(false)}
           onTogglePlay={() => void player.togglePlay()}
           onPrev={player.playPrev}
           onNext={() => player.playNext(false)}
@@ -626,19 +599,6 @@ export function App() {
                   </button>
                 ))}
               </div>
-              <button
-                type="button"
-                onClick={() => {
-                  manualCoverExitRef.current = false;
-                  setIsCoverMode(true);
-                }}
-                title="Galaxy Z Flip Cover Screen Mode"
-                aria-label="Galaxy Z Flip Cover Screen Mode"
-                className="px-2 h-7 rounded-lg bg-[#F5F5F7] text-[#1D1D1F] border border-black/[0.04] flex items-center gap-1 text-[11px] font-bold active:bg-black/10 transition"
-              >
-                <Smartphone className="w-3.5 h-3.5 text-[#FA243C]" />
-                <span>Flip</span>
-              </button>
               <button
                 type="button"
                 onClick={() => setIsSettingsOpen((prev) => !prev)}
@@ -1454,6 +1414,10 @@ export function App() {
                     onNavigateTab={(nextTab) => {
                       setTab(nextTab);
                       setIsSettingsOpen(false);
+                    }}
+                    onOpenFlipMode={() => {
+                      setIsSettingsOpen(false);
+                      setIsCoverMode(true);
                     }}
                     onResetWeeklyChart={handleResetWeeklyChart}
                   />
