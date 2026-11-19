@@ -660,7 +660,7 @@ export function App() {
       {/* Mobile-Only Day-Theme App Shell (max-w-[430px]) */}
       <div className="w-full max-w-[430px] min-h-screen bg-white relative flex flex-col shadow-[0_0_50px_rgba(0,0,0,0.08)]">
         {/* Sticky Frosted Header */}
-        <header className="sticky top-0 z-20 bg-white/75 backdrop-blur-2xl backdrop-saturate-150 px-5 pt-4 pb-2.5 border-b border-black/[0.05]">
+        <header className="sticky top-0 z-20 bg-white/92 backdrop-blur-2xl backdrop-saturate-150 px-5 pt-4 pb-2.5 border-b border-black/[0.05]">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-1.5">
               <span className="w-6 h-6 rounded-lg bg-[#FA243C] text-white flex items-center justify-center text-xs font-bold shadow-xs">
