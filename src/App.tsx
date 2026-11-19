@@ -52,7 +52,7 @@ import type { Language, Song, TabId } from './types';
 const LANGS: Language[] = ['kk', 'ko', 'en', 'ru'];
 const PLAYLIST_KEY = 'kwp_playlist_ids_v1';
 const LIKED_KEY = 'kwp_liked_ids_v1';
-const DEV_KAYNAR_KEY = 'kwp_dev_show_kaynar';
+const DEV_KAYNAR_KEY = 'kwp_show_kaynar_tab';
 
 type ListenFilter = 'all' | 'kaynar' | 'ru' | 'playlist' | 'offline';
 const GUITAR_KEYS = ['all', 'C', 'D', 'Dm', 'E', 'Em', 'F', 'G', 'A', 'Am', 'Bm', 'Bb'] as const;
@@ -134,7 +134,7 @@ export function App() {
   const pendingSongRef = useRef<Song | null>(null);
   const pendingPromptOnVisibleRef = useRef(false);
   const [showKaynarTab, setShowKaynarTab] = useState<boolean>(() => {
-    return localStorage.getItem(DEV_KAYNAR_KEY) !== 'false';
+    return localStorage.getItem(DEV_KAYNAR_KEY) === 'true';
   });
   const hasAutoLoadedRef = useRef(false);
 

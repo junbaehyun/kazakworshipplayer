@@ -164,6 +164,33 @@ export function SettingsAdminView({
           <ChevronRight className="w-4 h-4 text-[#86868B] shrink-0" />
         </button>
 
+        <div className="w-full px-4 py-3 flex items-center justify-between text-left">
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="w-8 h-8 rounded-xl bg-[#FA243C]/12 text-[#FA243C] flex items-center justify-center shrink-0">
+              <BookOpen className="w-4 h-4" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-xs font-bold text-[#1D1D1F] truncate">{t.tabKaynar} (바컷 카이나르)</p>
+              <p className="text-[11px] text-[#86868B] truncate">Show on bottom navigation bar</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={showKaynarTab}
+            onClick={() => onToggleKaynarTab(!showKaynarTab)}
+            className={`w-11 h-6 rounded-full p-0.5 transition shrink-0 ${
+              showKaynarTab ? 'bg-[#34C759]' : 'bg-black/15'
+            }`}
+          >
+            <span
+              className={`block w-5 h-5 rounded-full bg-white shadow-xs transition-transform ${
+                showKaynarTab ? 'translate-x-5' : 'translate-x-0'
+              }`}
+            />
+          </button>
+        </div>
+
         {devSettingsOpen && (
           <button
             type="button"
@@ -248,31 +275,6 @@ export function SettingsAdminView({
               className="text-[11px] text-white/60 hover:text-white"
             >
               Hide
-            </button>
-          </div>
-
-          <div className="flex items-center justify-between gap-3 bg-white/10 rounded-xl px-3.5 py-2.5">
-            <div className="flex items-center gap-2.5 min-w-0">
-              <BookOpen className="w-4 h-4 text-[#FA243C] shrink-0" />
-              <div className="min-w-0">
-                <p className="text-xs font-semibold truncate">{t.tabKaynar} (바컷 카이나르)</p>
-                <p className="text-[11px] text-white/60 truncate">Show/hide bottom tab menu</p>
-              </div>
-            </div>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={showKaynarTab}
-              onClick={() => onToggleKaynarTab(!showKaynarTab)}
-              className={`w-11 h-6 rounded-full p-0.5 transition shrink-0 ${
-                showKaynarTab ? 'bg-[#34C759]' : 'bg-white/25'
-              }`}
-            >
-              <span
-                className={`block w-5 h-5 rounded-full bg-white shadow-xs transition-transform ${
-                  showKaynarTab ? 'translate-x-5' : 'translate-x-0'
-                }`}
-              />
             </button>
           </div>
         </div>
