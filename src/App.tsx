@@ -10,10 +10,12 @@ import {
   Search,
   Settings,
   Shuffle,
+  Smartphone,
   X,
 } from 'lucide-react';
 import { AuthModal } from './components/AuthModal';
 import { BakhytKaynarView } from './components/BakhytKaynarView';
+import { FlipCoverView } from './components/FlipCoverView';
 import { FullPlayerSheet } from './components/FullPlayerSheet';
 import { InstallPromptBanner } from './components/InstallPromptBanner';
 import { MiniPlayer } from './components/MiniPlayer';
@@ -27,6 +29,7 @@ import {
   type KaynarSong,
 } from './data/bakhytKaynarSongs';
 import { useAudioPlayer } from './hooks/useAudioPlayer';
+import { useWakeLock } from './hooks/useWakeLock';
 import { translations } from './i18n/translations';
 import {
   clearAllOfflineBlobs,
@@ -107,6 +110,12 @@ export function App() {
   const [listenFilter, setListenFilter] = useState<ListenFilter>('all');
   const [preferredLyricsVersion, setPreferredLyricsVersion] = useState<'standard' | 'kaynar'>('standard');
   const [openLyricsSignal, setOpenLyricsSignal] = useState(0);
+  const [isCoverMode, setIsCoverMode] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return window.innerHeight <= 460 && window.innerWidth <= 460;
+  });
+  const manualCoverExitRef = useRef(false);
+  const wakeLock = useWakeLock(true);
   const pendingSongRef = useRef<Song | null>(null);
   const pendingPromptOnVisibleRef = useRef(false);
   const [showKaynarTab, setShowKaynarTab] = useState<boolean>(() => {
@@ -159,6 +168,19 @@ export function App() {
     void refreshSongs();
     void refreshOfflineStats();
   }, [refreshSongs, refreshOfflineStats]);
+
+  useEffect(() => {
+    const onResize = () => {
+      const isCompactSquare = window.innerHeight <= 460 && window.innerWidth <= 460;
+      if (isCompactSquare && !manualCoverExitRef.current) {
+        setIsCoverMode(true);
+      } else if (!isCompactSquare) {
+        manualCoverExitRef.current = false;
+      }
+    };
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   const handlePlayCountUpdated = useCallback((songId: string, newCount: number) => {
     setSongs((prev) =>
@@ -393,6 +415,72 @@ export function App() {
       ? t.tabUpload
       : t.settingsTitle;
 
+  if (isCoverMode) {
+    return (
+      <div className="min-h-screen bg-[#EFEFF4] flex justify-center">
+        <FlipCoverView
+          lang={lang}
+          t={t}
+          song={player.currentSong}
+          kaynarSong={
+            player.currentSong
+              ? (KAYNAR_SONG_BY_AUDIO_ID.get(player.currentSong.id) ?? null)
+              : null
+          }
+          defaultLyricsVersion={preferredLyricsVersion}
+          isPlaying={player.isPlaying}
+          currentTime={player.currentTime}
+          duration={player.duration}
+          repeatMode={player.repeatMode}
+          isShuffle={player.isShuffle}
+          allSongs={topChartSongs}
+          kaynarAudioIds={KAYNAR_AUDIO_IDS}
+          playlistIds={playlistIds}
+          wakeLockEnabled={wakeLock.enabled}
+          wakeLockLocked={wakeLock.isLocked}
+          onToggleWakeLock={wakeLock.toggleWakeLock}
+          onExitCoverMode={() => {
+            manualCoverExitRef.current = true;
+            setIsCoverMode(false);
+          }}
+          onTogglePlay={() => void player.togglePlay()}
+          onPrev={player.playPrev}
+          onNext={() => player.playNext(false)}
+          onSeek={player.seekTo}
+          onCycleRepeat={player.cycleRepeat}
+          onToggleShuffle={player.toggleShuffle}
+          onPlaySong={(s, fromKaynar) => {
+            setPreferredLyricsVersion(fromKaynar ? 'kaynar' : 'standard');
+            void player.playSong(s);
+          }}
+          onTogglePlaylist={handleTogglePlaylist}
+        />
+        <AuthModal
+          isOpen={isAuthModalOpen}
+          t={t}
+          onClose={() => setIsAuthModalOpen(false)}
+          onAuthenticated={(nextSession, localEmail) => {
+            isAuthenticatedRef.current = true;
+            if (nextSession) {
+              setSession(nextSession);
+            } else if (localEmail) {
+              localStorage.setItem('kwp_local_user_email', localEmail);
+              setLocalUserEmail(localEmail);
+            }
+            setIsAuthModalOpen(false);
+            const queued = pendingSongRef.current;
+            pendingSongRef.current = null;
+            if (queued) {
+              void player.playSong(queued);
+            } else {
+              player.playNext(false);
+            }
+          }}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#EFEFF4] flex justify-center">
       {/* Mobile-Only Day-Theme App Shell (max-w-[430px]) */}
@@ -425,6 +513,19 @@ export function App() {
                   </button>
                 ))}
               </div>
+              <button
+                type="button"
+                onClick={() => {
+                  manualCoverExitRef.current = false;
+                  setIsCoverMode(true);
+                }}
+                title="Galaxy Z Flip Cover Screen Mode"
+                aria-label="Galaxy Z Flip Cover Screen Mode"
+                className="px-2 h-7 rounded-lg bg-[#F5F5F7] text-[#1D1D1F] border border-black/[0.04] flex items-center gap-1 text-[11px] font-bold active:bg-black/10 transition"
+              >
+                <Smartphone className="w-3.5 h-3.5 text-[#FA243C]" />
+                <span>Flip</span>
+              </button>
               <button
                 type="button"
                 onClick={() => setIsSettingsOpen((prev) => !prev)}

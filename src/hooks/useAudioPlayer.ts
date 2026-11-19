@@ -123,10 +123,14 @@ export function useAudioPlayer({
       listenedSecondsRef.current = 0;
 
       if ('mediaSession' in navigator) {
+        const svgArtwork = `data:image/svg+xml;utf8,${encodeURIComponent(
+          `<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#FA243C"/><stop offset="100%" stop-color="#FF7A00"/></linearGradient></defs><rect width="512" height="512" rx="96" fill="url(#g)"/><text x="256" y="295" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="210" font-weight="800" fill="#FFFFFF">♫</text></svg>`
+        )}`;
         navigator.mediaSession.metadata = new MediaMetadata({
           title: song.title,
           artist: song.is_unknown_author ? 'Белгісіз автор' : song.artist,
           album: 'Қазақша Мадақ Әндері',
+          artwork: [{ src: svgArtwork, sizes: '512x512', type: 'image/svg+xml' }],
         });
       }
 
