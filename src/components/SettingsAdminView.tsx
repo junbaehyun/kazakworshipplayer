@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { BookOpen, Check, ChevronRight, CloudUpload, Code2, Download, HardDrive, LogOut, Mail, RotateCcw, ShieldCheck, Smartphone, Trash2, Trophy } from 'lucide-react';
+import { BookOpen, Check, ChevronRight, CloudUpload, Code2, Download, HardDrive, LogOut, Mail, Music2, RotateCcw, ShieldCheck, Smartphone, Trash2, Trophy } from 'lucide-react';
 import type { Session } from '@supabase/supabase-js';
 import type { TranslationStrings } from '../i18n/translations';
 import {
@@ -23,6 +23,8 @@ interface SettingsAdminViewProps {
   songs: Song[];
   showKaynarTab: boolean;
   onToggleKaynarTab: (next: boolean) => void;
+  showKeyFilter: boolean;
+  onToggleKeyFilter: (next: boolean) => void;
   onClearOffline: () => Promise<void>;
   onSessionChange: (session: Session | null) => void;
   onLocalSignOut: () => void;
@@ -43,6 +45,8 @@ export function SettingsAdminView({
   songs,
   showKaynarTab,
   onToggleKaynarTab,
+  showKeyFilter,
+  onToggleKeyFilter,
   onClearOffline,
   onSessionChange,
   onLocalSignOut,
@@ -186,6 +190,33 @@ export function SettingsAdminView({
             <span
               className={`block w-5 h-5 rounded-full bg-white shadow-xs transition-transform ${
                 showKaynarTab ? 'translate-x-5' : 'translate-x-0'
+              }`}
+            />
+          </button>
+        </div>
+
+        <div className="w-full px-4 py-3 flex items-center justify-between text-left">
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="w-8 h-8 rounded-xl bg-[#FF9500]/12 text-[#FF9500] flex items-center justify-center shrink-0">
+              <Music2 className="w-4 h-4" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-xs font-bold text-[#1D1D1F] truncate">Guitar Key Filter (코드 키 필터)</p>
+              <p className="text-[11px] text-[#86868B] truncate">Show key filter bar on song list</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={showKeyFilter}
+            onClick={() => onToggleKeyFilter(!showKeyFilter)}
+            className={`w-11 h-6 rounded-full p-0.5 transition shrink-0 ${
+              showKeyFilter ? 'bg-[#34C759]' : 'bg-black/15'
+            }`}
+          >
+            <span
+              className={`block w-5 h-5 rounded-full bg-white shadow-xs transition-transform ${
+                showKeyFilter ? 'translate-x-5' : 'translate-x-0'
               }`}
             />
           </button>

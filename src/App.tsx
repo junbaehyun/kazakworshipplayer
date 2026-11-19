@@ -6,8 +6,6 @@ import {
   Check,
   Download,
   HardDrive,
-  ListCheck,
-  ListPlus,
   Loader2,
   Music,
   Play,
@@ -65,6 +63,7 @@ const LANGS: Language[] = ['kk', 'ko', 'en', 'ru'];
 const PLAYLIST_KEY = 'kwp_playlist_ids_v1';
 const LIKED_KEY = 'kwp_liked_ids_v1';
 const DEV_KAYNAR_KEY = 'kwp_show_kaynar_tab';
+const SHOW_KEY_FILTER_KEY = 'kwp_show_key_filter';
 
 type ListenFilter = 'all' | 'kaynar' | 'ru' | 'playlist' | 'offline';
 const GUITAR_KEYS = ['all', 'C', 'D', 'Dm', 'E', 'Em', 'F', 'G', 'A', 'Am', 'Bm', 'Bb'] as const;
@@ -152,6 +151,9 @@ export function App() {
   const [showKaynarTab, setShowKaynarTab] = useState<boolean>(() => {
     return localStorage.getItem(DEV_KAYNAR_KEY) === 'true';
   });
+  const [showKeyFilter, setShowKeyFilter] = useState<boolean>(() => {
+    return localStorage.getItem(SHOW_KEY_FILTER_KEY) === 'true';
+  });
   const hasAutoLoadedRef = useRef(false);
 
   const isAdmin = useMemo(() => isAdminSession(session), [session]);
@@ -171,6 +173,14 @@ export function App() {
     localStorage.setItem(DEV_KAYNAR_KEY, String(next));
     if (!next && tab === 'kaynar') {
       setTab('listen');
+    }
+  };
+
+  const handleToggleKeyFilter = (next: boolean) => {
+    setShowKeyFilter(next);
+    localStorage.setItem(SHOW_KEY_FILTER_KEY, String(next));
+    if (!next) {
+      setSelectedKey('all');
     }
   };
 
@@ -242,21 +252,6 @@ export function App() {
         : [song.id, ...prev];
       try {
         localStorage.setItem(LIKED_KEY, JSON.stringify(next));
-      } catch {
-        // Ignore storage errors
-      }
-      return next;
-    });
-  }, []);
-
-  const handleAddAllToPlaylist = useCallback((songsToAdd: Song[]) => {
-    setPlaylistIds((prev) => {
-      const existing = new Set(prev);
-      const additions = songsToAdd.map((s) => s.id).filter((id) => !existing.has(id));
-      if (additions.length === 0) return prev;
-      const next = [...prev, ...additions];
-      try {
-        localStorage.setItem(PLAYLIST_KEY, JSON.stringify(next));
       } catch {
         // Ignore storage errors
       }
@@ -772,27 +767,29 @@ export function App() {
               </div>
 
               {/* Guitar Key Filter Bar */}
-              <div className="flex items-center gap-1 overflow-x-auto no-scrollbar pb-0.5">
-                {GUITAR_KEYS.map((k) => {
-                  const active = selectedKey === k;
-                  return (
-                    <button
-                      key={k}
-                      type="button"
-                      onClick={() => setSelectedKey(k)}
-                      className={`px-2.5 py-1 rounded-lg text-[11px] font-extrabold whitespace-nowrap transition shrink-0 ${
-                        active
-                          ? 'bg-[#1D1D1F] text-white'
-                          : 'bg-[#F5F5F7] text-[#515154] active:bg-black/10'
-                      }`}
-                    >
-                      {k === 'all' ? 'Key: All' : k}
-                    </button>
-                  );
-                })}
-              </div>
+              {showKeyFilter && (
+                <div className="flex items-center gap-1 overflow-x-auto no-scrollbar pb-0.5">
+                  {GUITAR_KEYS.map((k) => {
+                    const active = selectedKey === k;
+                    return (
+                      <button
+                        key={k}
+                        type="button"
+                        onClick={() => setSelectedKey(k)}
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-extrabold whitespace-nowrap transition shrink-0 ${
+                          active
+                            ? 'bg-[#1D1D1F] text-white'
+                            : 'bg-[#F5F5F7] text-[#515154] active:bg-black/10'
+                        }`}
+                      >
+                        {k === 'all' ? 'Key: All' : k}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
 
-              {/* Play / Shuffle / Add All Action Bar */}
+              {/* Play / Shuffle Action Bar */}
               {listenSongs.length > 0 && (
                 <div className="flex items-center gap-2">
                   <button
@@ -844,29 +841,6 @@ export function App() {
                       </span>
                     </button>
                   )}
-                  {listenFilter !== 'playlist' && listenFilter !== 'offline' && (() => {
-                    const allInPlaylist = listenSongs.every((s) => playlistIds.includes(s.id));
-                    return (
-                      <button
-                        type="button"
-                        onClick={() => handleAddAllToPlaylist(listenSongs)}
-                        disabled={allInPlaylist}
-                        title={allInPlaylist ? t.addedAllToPlaylist : t.addAllToPlaylist}
-                        className={`px-3 py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1 shrink-0 transition ${
-                          allInPlaylist
-                            ? 'bg-[#34C759]/15 text-[#34C759]'
-                            : 'bg-[#F5F5F7] text-[#1D1D1F] active:bg-black/10'
-                        }`}
-                      >
-                        {allInPlaylist ? (
-                          <ListCheck className="w-3.5 h-3.5" />
-                        ) : (
-                          <ListPlus className="w-3.5 h-3.5" />
-                        )}
-                        <span>{allInPlaylist ? t.addedAllToPlaylist : t.addAllToPlaylist}</span>
-                      </button>
-                    );
-                  })()}
                   {(listenFilter === 'playlist' || listenFilter === 'kaynar') && (() => {
                     const allOffline = listenSongs.every((s) => offlineIds.includes(s.id));
                     return (
@@ -1515,6 +1489,8 @@ export function App() {
                       songs={songs}
                       showKaynarTab={showKaynarTab}
                       onToggleKaynarTab={handleToggleKaynarTab}
+                      showKeyFilter={showKeyFilter}
+                      onToggleKeyFilter={handleToggleKeyFilter}
                       onClearOffline={handleClearOffline}
                       onSessionChange={setSession}
                       onLocalSignOut={() => {
