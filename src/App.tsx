@@ -550,6 +550,17 @@ export function App() {
     setSongs(reset);
   };
 
+  const handleResetLikedSongs = useCallback(() => {
+    setPlaylistIds([]);
+    setLikedIds([]);
+    try {
+      localStorage.removeItem(PLAYLIST_KEY);
+      localStorage.removeItem(LIKED_KEY);
+    } catch {
+      // Ignore storage errors
+    }
+  }, []);
+
   const songRankMap = useMemo(() => {
     const map = new Map<string, number>();
     topChartSongs.forEach((s, idx) => map.set(s.id, idx + 1));
@@ -1465,6 +1476,8 @@ export function App() {
                         setIsCoverMode(true);
                       }}
                       onResetWeeklyChart={handleResetWeeklyChart}
+                      likedCount={playlistSongs.length}
+                      onResetLikedSongs={handleResetLikedSongs}
                     />
                   </Suspense>
                 </div>

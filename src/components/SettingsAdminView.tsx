@@ -33,6 +33,8 @@ interface SettingsAdminViewProps {
   onNavigateTab: (tab: 'chart' | 'offline' | 'upload') => void;
   onOpenFlipMode: () => void;
   onResetWeeklyChart: () => void;
+  likedCount: number;
+  onResetLikedSongs: () => void;
 }
 
 export function SettingsAdminView({
@@ -55,6 +57,8 @@ export function SettingsAdminView({
   onNavigateTab,
   onOpenFlipMode,
   onResetWeeklyChart,
+  likedCount,
+  onResetLikedSongs,
 }: SettingsAdminViewProps) {
   const [email, setEmail] = useState('junbaehyun.kz@gmail.com');
   const [password, setPassword] = useState('');
@@ -62,6 +66,7 @@ export function SettingsAdminView({
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [reports, setReports] = useState<SongReport[]>([]);
   const [dombraTapCount, setDombraTapCount] = useState(0);
+  const [confirmResetLiked, setConfirmResetLiked] = useState(false);
   const [devSettingsOpen, setDevSettingsOpen] = useState(
     () => sessionStorage.getItem('kwp_dev_mode') === 'true'
   );
@@ -254,6 +259,35 @@ export function SettingsAdminView({
         >
           <RotateCcw className="w-3.5 h-3.5" />
           <span>Reset</span>
+        </button>
+      </div>
+
+      {/* Liked Songs / My Playlist Reset Control */}
+      <div className="bg-[#F5F5F7] rounded-2xl p-4 flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-xs font-bold text-[#1D1D1F] truncate">♥ {t.myPlaylistTitle}</p>
+          <p className="text-[11px] text-[#86868B]">{likedCount} songs</p>
+        </div>
+        <button
+          type="button"
+          disabled={likedCount === 0}
+          onClick={() => {
+            if (!confirmResetLiked) {
+              setConfirmResetLiked(true);
+              window.setTimeout(() => setConfirmResetLiked(false), 3000);
+              return;
+            }
+            onResetLikedSongs();
+            setConfirmResetLiked(false);
+          }}
+          className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 shrink-0 transition disabled:opacity-40 ${
+            confirmResetLiked
+              ? 'bg-[#FA243C] text-white border border-[#FA243C]'
+              : 'bg-white border border-black/[0.06] text-[#FA243C] active:bg-black/5'
+          }`}
+        >
+          <RotateCcw className="w-3.5 h-3.5" />
+          <span>{confirmResetLiked ? 'Confirm?' : 'Reset'}</span>
         </button>
       </div>
 
