@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   BookOpen,
+  Bookmark,
   Check,
   ChevronLeft,
   ChevronRight,
@@ -10,14 +11,24 @@ import {
   Music2,
   Pause,
   Play,
+  Trash2,
+  Volume2,
   X,
 } from 'lucide-react';
 import type { KaynarSong } from '../data/bakhytKaynarSongs';
 import {
   getCachedRussianTranslation,
+  getSavedRussianVocab,
   isRussianLyrics,
+  lookupRussianWord,
+  normalizeRussianWord,
+  removeSavedRussianWord,
+  speakRussianWord,
+  tokenizeTextWithWordMap,
+  toggleSavedRussianWord,
   translateRussianLinesToKorean,
   transliterateRussianToKorean,
+  type RussianWordInfo,
 } from '../lib/russianKorean';
 import type { Language } from '../types';
 
@@ -218,18 +229,80 @@ export function LyricsView({
   const [ruTranslations, setRuTranslations] = useState<Record<string, string>>({});
   const [isTranslatingRu, setIsTranslatingRu] = useState(false);
   const [translationError, setTranslationError] = useState(false);
+  const [studyMode, setStudyMode] = useState(true);
+  const [selectedWord, setSelectedWord] = useState<{
+    word: string;
+    normalized: string;
+    contextLine: string;
+  } | null>(null);
+  const [wordInfo, setWordInfo] = useState<RussianWordInfo | null>(null);
+  const [isLookingUpWord, setIsLookingUpWord] = useState(false);
+  const [wordLookupError, setWordLookupError] = useState(false);
+  const [savedVocab, setSavedVocab] = useState<RussianWordInfo[]>(() => getSavedRussianVocab());
+  const [showVocabDrawer, setShowVocabDrawer] = useState(false);
+  const wordReqIdRef = useRef(0);
   const lastManualScrollRef = useRef(0);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
-  const stanzaRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const stanzaRefs = useRef<(HTMLElement | null)[]>([]);
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
     setVersion(kaynarSong ? defaultVersion : 'standard');
     setTranspose(0);
+    setSelectedWord(null);
+    setWordInfo(null);
+    setWordLookupError(false);
+    setIsLookingUpWord(false);
+    wordReqIdRef.current += 1;
     if (scrollContainerRef.current) {
       scrollContainerRef.current.scrollTop = 0;
     }
-  }, [kaynarSong, defaultVersion, title]);
+  }, [kaynarSong, defaultVersion, title, songId]);
+
+  const savedVocabSet = useMemo(
+    () => new Set(savedVocab.map((v) => v.normalized)),
+    [savedVocab]
+  );
+
+  const handleTapRussianWord = (fullWord: string, contextLine: string) => {
+    const cleanWord = fullWord.replace(/^[^А-Яа-яЁё]+|[^А-Яа-яЁё]+$/g, '') || fullWord;
+    const normalized = normalizeRussianWord(cleanWord);
+    if (!normalized) return;
+
+    if (selectedWord && selectedWord.normalized === normalized && selectedWord.contextLine === contextLine) {
+      setSelectedWord(null);
+      setWordInfo(null);
+      return;
+    }
+
+    const reqId = ++wordReqIdRef.current;
+    setSelectedWord({ word: cleanWord, normalized, contextLine });
+    setWordInfo({
+      word: cleanWord,
+      normalized,
+      readingKo: transliterateRussianToKorean(cleanWord),
+      meaning: '',
+    });
+    setWordLookupError(false);
+    setIsLookingUpWord(true);
+
+    lookupRussianWord(cleanWord)
+      .then((info) => {
+        if (wordReqIdRef.current === reqId) {
+          setWordInfo(info);
+        }
+      })
+      .catch(() => {
+        if (wordReqIdRef.current === reqId) {
+          setWordLookupError(true);
+        }
+      })
+      .finally(() => {
+        if (wordReqIdRef.current === reqId) {
+          setIsLookingUpWord(false);
+        }
+      });
+  };
 
   const activeVersion = kaynarSong ? version : 'standard';
 
@@ -633,6 +706,39 @@ export function LyricsView({
                 {isTranslatingRu && <Loader2 className="w-3 h-3 animate-spin" />}
                 <span>한국어 번역</span>
               </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setStudyMode((v) => {
+                    if (v) {
+                      setSelectedWord(null);
+                      setWordInfo(null);
+                    }
+                    return !v;
+                  });
+                }}
+                className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold border transition ${
+                  studyMode
+                    ? 'bg-emerald-600 text-white border-emerald-600'
+                    : 'bg-white text-[#515154] border-black/10'
+                }`}
+              >
+                단어 학습
+              </button>
+              {savedVocab.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setShowVocabDrawer((v) => !v)}
+                  className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold border inline-flex items-center gap-1 transition ${
+                    showVocabDrawer
+                      ? 'bg-amber-500 text-white border-amber-500'
+                      : 'bg-amber-500/15 text-amber-800 border-amber-500/30'
+                  }`}
+                >
+                  <Bookmark className="w-3 h-3" />
+                  <span>단어장 ({savedVocab.length})</span>
+                </button>
+              )}
             </>
           )}
         </div>
@@ -663,6 +769,72 @@ export function LyricsView({
           </div>
         )}
       </div>
+
+      {/* Interactive Study Tip Banner */}
+      {showRussianKoTools && studyMode && !selectedWord && !showVocabDrawer && (
+        <div className="px-3.5 py-1.5 bg-emerald-50/90 border-b border-emerald-500/15 text-[11px] font-medium text-emerald-800 flex items-center justify-between gap-2 shrink-0">
+          <span className="truncate">
+            러시아어 단어를 탭하면 뜻 · 발음 · 음성을 바로 학습할 수 있어요
+          </span>
+        </div>
+      )}
+
+      {/* Saved Vocabulary Review Drawer */}
+      {showRussianKoTools && showVocabDrawer && (
+        <div className="bg-amber-50/75 border-b border-amber-500/20 px-3.5 py-2.5 max-h-48 overflow-y-auto space-y-1.5 shrink-0">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-extrabold text-amber-900">
+              내 러시아어 단어장 ({savedVocab.length})
+            </span>
+            <button
+              type="button"
+              onClick={() => setShowVocabDrawer(false)}
+              className="text-[11px] font-bold text-[#86868B]"
+            >
+              닫기
+            </button>
+          </div>
+          {savedVocab.map((item) => (
+            <div
+              key={item.normalized}
+              className="bg-white rounded-xl px-2.5 py-1.5 border border-amber-500/15 flex items-center justify-between gap-2"
+            >
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-xs font-extrabold text-[#1D1D1F]">{item.word}</span>
+                  <span className="text-[10px] font-semibold text-sky-700 bg-sky-50 px-1.5 py-0.5 rounded-md">
+                    {item.readingKo}
+                  </span>
+                  {item.pos && (
+                    <span className="text-[10px] font-medium text-[#86868B]">{item.pos}</span>
+                  )}
+                </div>
+                <p className="text-[11px] font-semibold text-[#515154] truncate">
+                  {item.meaning}
+                </p>
+              </div>
+              <div className="flex items-center gap-1 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => speakRussianWord(item.word)}
+                  aria-label="Listen pronunciation"
+                  className="w-7 h-7 rounded-lg bg-[#F5F5F7] text-[#1D1D1F] flex items-center justify-center active:scale-95"
+                >
+                  <Volume2 className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSavedVocab(removeSavedRussianWord(item.normalized))}
+                  aria-label="Remove saved word"
+                  className="w-7 h-7 rounded-lg bg-[#FA243C]/10 text-[#FA243C] flex items-center justify-center active:scale-95"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Worship Reader Stanza Cards */}
       <div
@@ -779,14 +951,20 @@ export function LyricsView({
             const tagInfo = stanza.tag ? formatSectionTag(stanza.tag, lang) : null;
 
             return (
-              <button
+              <div
                 key={`${stanza.tag ?? 's'}-${idx}`}
                 ref={(el) => {
                   stanzaRefs.current[idx] = el;
                 }}
-                type="button"
+                role="button"
+                tabIndex={0}
                 onClick={() => {
                   if (duration > 0) onSeek(targetTime);
+                }}
+                onKeyDown={(e) => {
+                  if ((e.key === 'Enter' || e.key === ' ') && duration > 0) {
+                    onSeek(targetTime);
+                  }
                 }}
                 className={`w-full text-left rounded-2xl border overflow-hidden transition-all duration-300 ${
                   isActive
@@ -814,10 +992,76 @@ export function LyricsView({
                       ? parseChordedLine(line, transpose)
                       : null;
                     const plainLine = stripChords(line);
+                    const interactiveWords = showRussianKoTools && studyMode;
+                    const tokenizedChordSegments =
+                      chordSegments && interactiveWords
+                        ? tokenizeTextWithWordMap(chordSegments)
+                        : null;
+                    const tokenizedPlainPieces =
+                      !chordSegments && interactiveWords
+                        ? tokenizeTextWithWordMap([{ text: plainLine }])[0]?.pieces ?? []
+                        : null;
+
+                    const renderInteractivePieces = (
+                      pieces: Array<{ text: string; fullWord?: string; normalized?: string }>
+                    ) =>
+                      pieces.map((piece, pIdx) => {
+                        if (!piece.fullWord || !piece.normalized) {
+                          return <span key={pIdx}>{piece.text}</span>;
+                        }
+                        const isSelected = selectedWord?.normalized === piece.normalized;
+                        const isSaved = savedVocabSet.has(piece.normalized);
+                        return (
+                          <span
+                            key={pIdx}
+                            role="button"
+                            tabIndex={0}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleTapRussianWord(piece.fullWord!, plainLine);
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.stopPropagation();
+                                handleTapRussianWord(piece.fullWord!, plainLine);
+                              }
+                            }}
+                            className={`cursor-pointer transition ${
+                              isSelected
+                                ? 'bg-emerald-500/20 text-emerald-900 rounded-sm underline decoration-emerald-600 decoration-2 underline-offset-4'
+                                : isSaved
+                                ? 'bg-amber-100/80 rounded-sm underline decoration-dotted decoration-amber-600/70 underline-offset-4'
+                                : 'underline decoration-dotted decoration-emerald-500/45 underline-offset-4 active:bg-emerald-500/15 rounded-sm'
+                            }`}
+                          >
+                            {piece.text}
+                          </span>
+                        );
+                      });
 
                     return (
                       <div key={lineIdx} className="px-3.5 py-2.5 space-y-1">
-                        {chordSegments ? (
+                        {tokenizedChordSegments ? (
+                          <div
+                            className={`flex flex-wrap items-end leading-snug text-[#1D1D1F] ${FONT_SIZE_CLASSES[fontStep]}`}
+                          >
+                            {tokenizedChordSegments.map((seg, sIdx) => (
+                              <span
+                                key={sIdx}
+                                className="inline-flex flex-col items-start whitespace-pre-wrap"
+                              >
+                                <span className="text-[11px] font-extrabold font-mono text-[#FA243C] leading-none mb-1 min-h-[12px]">
+                                  {seg.chord || '\u00A0'}
+                                </span>
+                                <span className="font-bold">
+                                  {seg.pieces.length > 0
+                                    ? renderInteractivePieces(seg.pieces)
+                                    : '\u00A0'}
+                                </span>
+                              </span>
+                            ))}
+                          </div>
+                        ) : chordSegments ? (
                           <div
                             className={`flex flex-wrap items-end leading-snug text-[#1D1D1F] ${FONT_SIZE_CLASSES[fontStep]}`}
                           >
@@ -837,7 +1081,9 @@ export function LyricsView({
                           <p
                             className={`font-bold tracking-[-0.01em] text-[#1D1D1F] ${FONT_SIZE_CLASSES[fontStep]}`}
                           >
-                            {plainLine}
+                            {tokenizedPlainPieces
+                              ? renderInteractivePieces(tokenizedPlainPieces)
+                              : plainLine}
                           </p>
                         )}
                         {showRussianKoTools && showKoReading && plainLine.trim() && (
@@ -864,11 +1110,128 @@ export function LyricsView({
                     );
                   })}
                 </div>
-              </button>
+              </div>
             );
           })
         )}
       </div>
+
+      {/* Bottom Pinned Russian Word Study Card */}
+      {showRussianKoTools && selectedWord && (
+        <div
+          className="shrink-0 border-t border-black/[0.08] bg-white/95 backdrop-blur-xl shadow-[0_-10px_28px_rgba(0,0,0,0.08)] px-4 py-3.5 space-y-2.5"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0 flex-1 space-y-1">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="text-lg font-extrabold text-[#1D1D1F] leading-tight">
+                  {wordInfo?.word || selectedWord.word}
+                </span>
+                <span className="px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 text-[11px] font-bold">
+                  {wordInfo?.readingKo || transliterateRussianToKorean(selectedWord.word)}
+                </span>
+                {wordInfo?.pos && (
+                  <span className="px-2 py-0.5 rounded-md bg-[#F5F5F7] text-[#515154] text-[10px] font-bold">
+                    {wordInfo.pos}
+                  </span>
+                )}
+              </div>
+              {wordInfo?.romanization && (
+                <p className="text-[11px] font-mono text-[#86868B]">{wordInfo.romanization}</p>
+              )}
+            </div>
+
+            <div className="flex items-center gap-1 shrink-0">
+              <button
+                type="button"
+                onClick={() => speakRussianWord(wordInfo?.word || selectedWord.word)}
+                aria-label="Pronounce Russian word"
+                className="w-8 h-8 rounded-xl bg-sky-50 text-sky-700 flex items-center justify-center active:scale-95 transition"
+              >
+                <Volume2 className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                disabled={!wordInfo || !wordInfo.meaning}
+                onClick={() => {
+                  if (!wordInfo || !wordInfo.meaning) return;
+                  setSavedVocab(toggleSavedRussianWord(wordInfo));
+                }}
+                aria-label="Save word to vocabulary"
+                className={`w-8 h-8 rounded-xl flex items-center justify-center active:scale-95 transition disabled:opacity-40 ${
+                  savedVocabSet.has(selectedWord.normalized)
+                    ? 'bg-amber-500 text-white'
+                    : 'bg-[#F5F5F7] text-[#515154]'
+                }`}
+              >
+                <Bookmark
+                  className={`w-4 h-4 ${
+                    savedVocabSet.has(selectedWord.normalized) ? 'fill-white' : ''
+                  }`}
+                />
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedWord(null);
+                  setWordInfo(null);
+                }}
+                aria-label="Close word study"
+                className="w-8 h-8 rounded-xl bg-[#F5F5F7] text-[#86868B] flex items-center justify-center active:scale-95 transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+
+          {/* Primary Korean Meaning */}
+          <div className="min-h-[22px] flex items-center">
+            {isLookingUpWord && !wordInfo?.meaning ? (
+              <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#86868B]">
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-600" />
+                <span>뜻을 찾는 중...</span>
+              </span>
+            ) : wordLookupError && !wordInfo?.meaning ? (
+              <span className="text-xs font-medium text-[#86868B]">
+                단어 뜻을 불러오지 못했습니다
+              </span>
+            ) : (
+              <p className="text-sm font-extrabold text-emerald-700">{wordInfo?.meaning}</p>
+            )}
+          </div>
+
+          {wordInfo?.note && (
+            <p className="text-[11px] font-medium text-[#515154] bg-emerald-50/70 border border-emerald-500/15 rounded-lg px-2.5 py-1">
+              {wordInfo.note}
+            </p>
+          )}
+
+          {wordInfo?.dictEntries && wordInfo.dictEntries.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {wordInfo.dictEntries.slice(0, 2).map((entry, eIdx) => (
+                <span
+                  key={eIdx}
+                  className="text-[10px] font-medium text-[#515154] bg-[#F5F5F7] rounded-lg px-2 py-0.5"
+                >
+                  <strong className="text-[#1D1D1F]">{entry.pos}:</strong>{' '}
+                  {entry.terms.join(', ')}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {/* Sentence Context */}
+          <div className="bg-[#F5F5F7] rounded-xl px-3 py-2 space-y-0.5">
+            <p className="text-xs font-bold text-[#1D1D1F]">{selectedWord.contextLine}</p>
+            {ruTranslations[selectedWord.contextLine.trim()] && (
+              <p className="text-[11px] text-[#6E6E73]">
+                {ruTranslations[selectedWord.contextLine.trim()]}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -39,6 +39,55 @@ async function callMyMemory(line, source, target) {
     : '';
 }
 
+async function lookupWord(word, source, target) {
+  for (const client of ['dict-chrome-ex', 'gtx']) {
+    try {
+      const url = `https://translate.googleapis.com/translate_a/single?client=${client}&sl=${encodeURIComponent(
+        source
+      )}&tl=${encodeURIComponent(target)}&dt=t&dt=bd&dt=rm&q=${encodeURIComponent(word)}`;
+      const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+      if (!res.ok) continue;
+      const data = await res.json();
+      if (!Array.isArray(data?.[0])) continue;
+
+      const meaning = data[0]
+        .map((seg) => (Array.isArray(seg) && typeof seg[0] === 'string' ? seg[0] : ''))
+        .join('')
+        .trim();
+
+      let romanization = '';
+      for (const seg of data[0]) {
+        if (Array.isArray(seg) && typeof seg[3] === 'string' && seg[3].trim()) {
+          romanization = seg[3].trim();
+          break;
+        }
+      }
+
+      const dictEntries = Array.isArray(data[1])
+        ? data[1]
+            .filter((entry) => Array.isArray(entry) && typeof entry[0] === 'string' && Array.isArray(entry[1]))
+            .map((entry) => ({
+              pos: entry[0],
+              terms: entry[1].filter((t) => typeof t === 'string').slice(0, 4),
+            }))
+        : [];
+
+      if (meaning) {
+        return { word, meaning, romanization, dictEntries };
+      }
+    } catch {
+      // Try next client
+    }
+  }
+
+  try {
+    const fallback = (await callMyMemory(word, source, target)).trim();
+    return { word, meaning: fallback, romanization: '', dictEntries: [] };
+  } catch {
+    return { word, meaning: '', romanization: '', dictEntries: [] };
+  }
+}
+
 async function translateChunk(chunkLines, source, target) {
   if (chunkLines.length === 0) return [];
   const joined = chunkLines.join('\n');
@@ -99,9 +148,29 @@ export default async function handler(request) {
     });
   }
 
-  const lines = body?.lines;
   const source = typeof body?.source === 'string' && body.source ? body.source : 'ru';
   const target = typeof body?.target === 'string' && body.target ? body.target : 'ko';
+
+  if (body?.mode === 'word') {
+    const rawWord = typeof body?.word === 'string' ? body.word.trim() : '';
+    if (!rawWord || rawWord.length > 80) {
+      return new Response(JSON.stringify({ error: 'Invalid word payload' }), {
+        status: 400,
+        headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+      });
+    }
+    const result = await lookupWord(rawWord, source, target);
+    return new Response(JSON.stringify(result), {
+      status: 200,
+      headers: {
+        ...CORS_HEADERS,
+        'Content-Type': 'application/json',
+        'Cache-Control': 'public, max-age=604800',
+      },
+    });
+  }
+
+  const lines = body?.lines;
 
   if (!Array.isArray(lines) || lines.length > 200 || lines.some((l) => typeof l !== 'string')) {
     return new Response(JSON.stringify({ error: 'Invalid lines payload' }), {
