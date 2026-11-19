@@ -1,4 +1,4 @@
-import { Heart, ListCheck, ListPlus, Music2, Pause, Play } from 'lucide-react';
+import { BookOpen, Heart, Music2, Pause, Play } from 'lucide-react';
 import type { TranslationStrings } from '../i18n/translations';
 import type { Song } from '../types';
 
@@ -28,6 +28,7 @@ interface SongRowProps {
   isKaynar?: boolean;
   t: TranslationStrings;
   onPlay: (song: Song) => void;
+  onOpenLyrics?: (song: Song) => void;
   onToggleOffline?: (song: Song) => void;
   onTogglePlaylist?: (song: Song) => void;
   onToggleLike?: (song: Song) => void;
@@ -40,12 +41,11 @@ export function SongRow({
   isCurrent,
   isPlaying,
   isInPlaylist = false,
-  isLiked = false,
   isKaynar = false,
   t,
   onPlay,
+  onOpenLyrics,
   onTogglePlaylist,
-  onToggleLike,
 }: SongRowProps) {
   const authorLabel = song.is_unknown_author ? t.unknownAuthor : song.artist;
   const gradient = getSongGradient(song.id);
@@ -104,37 +104,31 @@ export function SongRow({
       </button>
 
       <div className="flex items-center gap-1.5 shrink-0">
+        {onOpenLyrics && (
+          <button
+            type="button"
+            onClick={() => onOpenLyrics(song)}
+            title={t.lyricsBtn}
+            aria-label={t.lyricsBtn}
+            className="w-8 h-8 rounded-full bg-[#F5F5F7] text-[#515154] flex items-center justify-center active:bg-black/10 transition"
+          >
+            <BookOpen className="w-3.5 h-3.5" />
+          </button>
+        )}
+
         {onTogglePlaylist && (
           <button
             type="button"
             onClick={() => onTogglePlaylist(song)}
             title={isInPlaylist ? t.inPlaylist : t.addToPlaylist}
+            aria-label={isInPlaylist ? t.inPlaylist : t.addToPlaylist}
             className={`w-8 h-8 rounded-full flex items-center justify-center transition ${
               isInPlaylist
                 ? 'bg-[#FA243C]/12 text-[#FA243C]'
                 : 'bg-[#F5F5F7] text-[#86868B] active:bg-black/10'
             }`}
           >
-            {isInPlaylist ? (
-              <ListCheck className="w-3.5 h-3.5" />
-            ) : (
-              <ListPlus className="w-3.5 h-3.5" />
-            )}
-          </button>
-        )}
-
-        {onToggleLike && (
-          <button
-            type="button"
-            onClick={() => onToggleLike(song)}
-            aria-label="Like"
-            className={`w-8 h-8 rounded-full flex items-center justify-center transition ${
-              isLiked
-                ? 'bg-[#FA243C]/12 text-[#FA243C]'
-                : 'bg-[#F5F5F7] text-[#86868B] active:bg-black/10'
-            }`}
-          >
-            <Heart className={`w-3.5 h-3.5 ${isLiked ? 'fill-[#FA243C]' : ''}`} />
+            <Heart className={`w-3.5 h-3.5 ${isInPlaylist ? 'fill-[#FA243C]' : ''}`} />
           </button>
         )}
       </div>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Check,
   ChevronDown,
@@ -26,6 +26,7 @@ interface FullPlayerSheetProps {
   kaynarSong?: KaynarSong | null;
   lang: Language;
   defaultLyricsVersion?: 'standard' | 'kaynar';
+  openLyricsSignal?: number;
   isPlaying: boolean;
   isOffline: boolean;
   currentTime: number;
@@ -57,6 +58,7 @@ export function FullPlayerSheet({
   kaynarSong = null,
   lang,
   defaultLyricsVersion = 'standard',
+  openLyricsSignal = 0,
   isPlaying,
   isOffline,
   currentTime,
@@ -75,6 +77,12 @@ export function FullPlayerSheet({
   onOpenReport,
 }: FullPlayerSheetProps) {
   const [showLyrics, setShowLyrics] = useState(false);
+
+  useEffect(() => {
+    if (openLyricsSignal > 0) {
+      setShowLyrics(true);
+    }
+  }, [openLyricsSignal]);
 
   const author = song.is_unknown_author ? t.unknownAuthor : song.artist;
   const gradient = getSongGradient(song.id);

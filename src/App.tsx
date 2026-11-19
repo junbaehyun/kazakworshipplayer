@@ -67,9 +67,15 @@ export function App() {
   const [songs, setSongs] = useState<Song[]>([]);
   const [playlistIds, setPlaylistIds] = useState<string[]>(() => {
     try {
-      const raw = localStorage.getItem(PLAYLIST_KEY);
-      const parsed = raw ? (JSON.parse(raw) as unknown) : [];
-      return Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === 'string') : [];
+      const rawPl = localStorage.getItem(PLAYLIST_KEY);
+      const rawLiked = localStorage.getItem(LIKED_KEY);
+      const pl = rawPl ? (JSON.parse(rawPl) as unknown) : [];
+      const lk = rawLiked ? (JSON.parse(rawLiked) as unknown) : [];
+      const combined = [
+        ...(Array.isArray(pl) ? pl.filter((x): x is string => typeof x === 'string') : []),
+        ...(Array.isArray(lk) ? lk.filter((x): x is string => typeof x === 'string') : []),
+      ];
+      return Array.from(new Set(combined));
     } catch {
       return [];
     }
@@ -100,6 +106,7 @@ export function App() {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [listenFilter, setListenFilter] = useState<ListenFilter>('all');
   const [preferredLyricsVersion, setPreferredLyricsVersion] = useState<'standard' | 'kaynar'>('standard');
+  const [openLyricsSignal, setOpenLyricsSignal] = useState(0);
   const pendingSongRef = useRef<Song | null>(null);
   const pendingPromptOnVisibleRef = useRef(false);
   const [showKaynarTab, setShowKaynarTab] = useState<boolean>(() => {
@@ -316,6 +323,18 @@ export function App() {
     onSongEnded: handleSongEnded,
   });
 
+  const handleOpenSongLyrics = useCallback(
+    (song: Song, version?: 'standard' | 'kaynar') => {
+      setPreferredLyricsVersion(version ?? (listenFilter === 'kaynar' ? 'kaynar' : 'standard'));
+      if (player.currentSong?.id !== song.id) {
+        void player.playSong(song);
+      }
+      setOpenLyricsSignal((n) => n + 1);
+      setIsFullPlayerOpen(true);
+    },
+    [listenFilter, player]
+  );
+
   useEffect(() => {
     if (hasAutoLoadedRef.current || libraryQueue.length === 0 || player.currentSong) return;
     hasAutoLoadedRef.current = true;
@@ -449,14 +468,13 @@ export function App() {
             <>
               <InstallPromptBanner t={t} />
 
-              {/* Filter Chips (All | Бақыт қайнар | My Playlist | Liked) */}
+              {/* Filter Chips (All | Бақыт қайнар | My Playlist) */}
               <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
                 {(
                   [
                     { id: 'all', label: t.filterAll, count: topChartSongs.length },
                     { id: 'kaynar', label: t.tabKaynar, count: kaynarPlayableCount },
                     { id: 'playlist', label: t.myPlaylistTitle, count: playlistSongs.length },
-                    { id: 'liked', label: t.filterLiked, count: likedIds.length },
                   ] as const
                 ).map((chip) => {
                   const active = listenFilter === chip.id;
@@ -561,6 +579,7 @@ export function App() {
                           setPreferredLyricsVersion(listenFilter === 'kaynar' ? 'kaynar' : 'standard');
                           void player.playSong(song);
                         }}
+                        onOpenLyrics={(song) => handleOpenSongLyrics(song)}
                         onToggleOffline={(song) => void handleToggleOffline(song)}
                         onTogglePlaylist={handleTogglePlaylist}
                         isLiked={likedIds.includes(s.id)}
@@ -615,6 +634,7 @@ export function App() {
                       isInPlaylist={playlistIds.includes(s.id)}
                       t={t}
                       onPlay={(song) => void player.playSong(song)}
+                      onOpenLyrics={(song) => handleOpenSongLyrics(song)}
                       onToggleOffline={(song) => void handleToggleOffline(song)}
                       onTogglePlaylist={handleTogglePlaylist}
                         isLiked={likedIds.includes(s.id)}
@@ -679,6 +699,7 @@ export function App() {
                         isInPlaylist={true}
                         t={t}
                         onPlay={(song) => void player.playSong(song)}
+                        onOpenLyrics={(song) => handleOpenSongLyrics(song)}
                         onToggleOffline={(song) => void handleToggleOffline(song)}
                         onTogglePlaylist={handleTogglePlaylist}
                         isLiked={likedIds.includes(s.id)}
@@ -715,6 +736,7 @@ export function App() {
                         isInPlaylist={playlistIds.includes(s.id)}
                         t={t}
                         onPlay={(song) => void player.playSong(song)}
+                        onOpenLyrics={(song) => handleOpenSongLyrics(song)}
                         onToggleOffline={(song) => void handleToggleOffline(song)}
                         onTogglePlaylist={handleTogglePlaylist}
                         isLiked={likedIds.includes(s.id)}
@@ -824,6 +846,7 @@ export function App() {
             kaynarSong={KAYNAR_SONG_BY_AUDIO_ID.get(player.currentSong.id) ?? null}
             lang={lang}
             defaultLyricsVersion={preferredLyricsVersion}
+            openLyricsSignal={openLyricsSignal}
             isPlaying={player.isPlaying}
             isOffline={offlineIds.includes(player.currentSong.id)}
             currentTime={player.currentTime}
