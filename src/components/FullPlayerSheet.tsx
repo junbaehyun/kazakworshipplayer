@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
+  BookOpen,
   Check,
   ChevronDown,
   Download,
@@ -44,6 +45,7 @@ interface FullPlayerSheetProps {
   onToggleShuffle: () => void;
   onToggleOffline: (song: Song) => void;
   onOpenReport: (song: Song) => void;
+  onOpenLyricsMode?: (song: Song) => void;
 }
 
 function formatTime(sec: number): string {
@@ -77,6 +79,7 @@ export function FullPlayerSheet({
   onToggleShuffle,
   onToggleOffline,
   onOpenReport,
+  onOpenLyricsMode,
 }: FullPlayerSheetProps) {
   const [showLyrics, setShowLyrics] = useState(false);
 
@@ -121,7 +124,10 @@ export function FullPlayerSheet({
         <div className="my-auto flex flex-col items-center py-2">
           <button
             type="button"
-            onClick={() => setShowLyrics(true)}
+            onClick={() => {
+              if (onOpenLyricsMode) onOpenLyricsMode(song);
+              else setShowLyrics(true);
+            }}
             aria-label={t.lyricsBtn}
             className={`am-spring ${
               isPlaying ? 'scale-100' : 'scale-90 opacity-90'
@@ -243,7 +249,19 @@ export function FullPlayerSheet({
         </div>
 
         {/* Bottom Mode Pills */}
-        <div className="grid grid-cols-2 gap-2 pt-1">
+        <div className="grid grid-cols-3 gap-2 pt-1">
+          <button
+            type="button"
+            onClick={() => {
+              if (onOpenLyricsMode) onOpenLyricsMode(song);
+              else setShowLyrics((prev) => !prev);
+            }}
+            className="py-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-1 bg-[#F5F5F7] text-[#1D1D1F] active:bg-black/10 transition"
+          >
+            <BookOpen className="w-3.5 h-3.5 text-[#FA243C]" />
+            <span>{t.lyricsBtn}</span>
+          </button>
+
           <button
             type="button"
             onClick={onToggleShuffle}

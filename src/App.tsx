@@ -1414,6 +1414,7 @@ export function App() {
               onToggleShuffle={player.toggleShuffle}
               onToggleOffline={handleRowToggleOffline}
               onOpenReport={handleRowOpenReport}
+              onOpenLyricsMode={handleOpenSongLyrics}
             />
           </Suspense>
         )}
