@@ -3,14 +3,21 @@ import type { Session } from '@supabase/supabase-js';
 import {
   ArrowLeft,
   BookOpen,
+  Check,
+  Download,
+  HardDrive,
   ListCheck,
   ListPlus,
+  Loader2,
   Music,
   Play,
   Search,
   Settings,
   Shuffle,
   Smartphone,
+  Trash2,
+  Wifi,
+  WifiOff,
   X,
 } from 'lucide-react';
 import { AuthModal } from './components/AuthModal';
@@ -46,7 +53,7 @@ const PLAYLIST_KEY = 'kwp_playlist_ids_v1';
 const LIKED_KEY = 'kwp_liked_ids_v1';
 const DEV_KAYNAR_KEY = 'kwp_dev_show_kaynar';
 
-type ListenFilter = 'all' | 'kaynar' | 'playlist' | 'liked';
+type ListenFilter = 'all' | 'kaynar' | 'playlist' | 'offline';
 
 const KAYNAR_BY_ID = new Map<string, KaynarSong>(bakhytKaynarSongs.map((s) => [s.id, s]));
 const KAYNAR_SONG_BY_AUDIO_ID = new Map<string, KaynarSong>();
@@ -95,6 +102,14 @@ export function App() {
   const [offlineIds, setOfflineIds] = useState<string[]>([]);
   const [offlineBytes, setOfflineBytes] = useState<number>(0);
   const [savingOfflineId, setSavingOfflineId] = useState<string | null>(null);
+  const [batchOfflineProgress, setBatchOfflineProgress] = useState<{
+    current: number;
+    total: number;
+  } | null>(null);
+  const cancelBatchOfflineRef = useRef(false);
+  const [isOnline, setIsOnline] = useState<boolean>(() =>
+    typeof navigator !== 'undefined' ? navigator.onLine : true
+  );
   const [isFullPlayerOpen, setIsFullPlayerOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [noticeOpen, setNoticeOpen] = useState(false);
@@ -168,6 +183,17 @@ export function App() {
     void refreshSongs();
     void refreshOfflineStats();
   }, [refreshSongs, refreshOfflineStats]);
+
+  useEffect(() => {
+    const onOnline = () => setIsOnline(true);
+    const onOffline = () => setIsOnline(false);
+    window.addEventListener('online', onOnline);
+    window.addEventListener('offline', onOffline);
+    return () => {
+      window.removeEventListener('online', onOnline);
+      window.removeEventListener('offline', onOffline);
+    };
+  }, []);
 
   useEffect(() => {
     const onResize = () => {
@@ -285,11 +311,11 @@ export function App() {
           (s.lyrics && s.lyrics.toLowerCase().includes(q))
       );
     }
-    if (listenFilter === 'liked') {
-      return filteredSongs.filter((s) => likedIds.includes(s.id));
+    if (listenFilter === 'offline') {
+      return filteredSongs.filter((s) => offlineIds.includes(s.id));
     }
     return filteredSongs;
-  }, [filteredSongs, likedIds, listenFilter, playlistSongs, search]);
+  }, [filteredSongs, listenFilter, offlineIds, playlistSongs, search]);
 
   const libraryQueue = useMemo(
     () => (listenSongs.length > 0 ? listenSongs : topChartSongs),
@@ -378,6 +404,36 @@ export function App() {
       console.error('Failed to save offline:', err);
     } finally {
       setSavingOfflineId(null);
+    }
+  };
+
+  const handleBatchSaveOffline = async (targetSongs: Song[]) => {
+    if (batchOfflineProgress) {
+      cancelBatchOfflineRef.current = true;
+      return;
+    }
+    const missing = targetSongs.filter((s) => !offlineIds.includes(s.id));
+    if (missing.length === 0) return;
+
+    cancelBatchOfflineRef.current = false;
+    setBatchOfflineProgress({ current: 0, total: missing.length });
+    try {
+      for (let i = 0; i < missing.length; i++) {
+        if (cancelBatchOfflineRef.current) break;
+        const item = missing[i];
+        setBatchOfflineProgress({ current: i + 1, total: missing.length });
+        setSavingOfflineId(item.id);
+        try {
+          await fetchAndCacheAudioBlob(item);
+          await refreshOfflineStats();
+        } catch (err) {
+          console.warn('Batch offline skip track:', item.id, err);
+        }
+      }
+    } finally {
+      setSavingOfflineId(null);
+      setBatchOfflineProgress(null);
+      cancelBatchOfflineRef.current = false;
     }
   };
 
@@ -569,13 +625,14 @@ export function App() {
             <>
               <InstallPromptBanner t={t} />
 
-              {/* Filter Chips (All | Бақыт қайнар | My Playlist) */}
+              {/* Filter Chips (All | Бақыт қайнар | My Playlist | Offline) */}
               <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
                 {(
                   [
                     { id: 'all', label: t.filterAll, count: topChartSongs.length },
                     { id: 'kaynar', label: t.tabKaynar, count: kaynarPlayableCount },
                     { id: 'playlist', label: t.myPlaylistTitle, count: playlistSongs.length },
+                    { id: 'offline', label: t.tabOffline, count: offlineIds.length },
                   ] as const
                 ).map((chip) => {
                   const active = listenFilter === chip.id;
@@ -630,7 +687,7 @@ export function App() {
                     <Shuffle className="w-3.5 h-3.5" />
                     <span>{t.shuffleBtn}</span>
                   </button>
-                  {listenFilter !== 'playlist' && (() => {
+                  {listenFilter !== 'playlist' && listenFilter !== 'offline' && (() => {
                     const allInPlaylist = listenSongs.every((s) => playlistIds.includes(s.id));
                     return (
                       <button
@@ -653,6 +710,88 @@ export function App() {
                       </button>
                     );
                   })()}
+                  {(listenFilter === 'playlist' || listenFilter === 'kaynar') && (() => {
+                    const allOffline = listenSongs.every((s) => offlineIds.includes(s.id));
+                    return (
+                      <button
+                        type="button"
+                        onClick={() => void handleBatchSaveOffline(listenSongs)}
+                        disabled={allOffline && !batchOfflineProgress}
+                        title={allOffline ? t.savedOffline : t.saveOffline}
+                        className={`px-3 py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1 shrink-0 transition ${
+                          batchOfflineProgress
+                            ? 'bg-[#FA243C]/12 text-[#FA243C]'
+                            : allOffline
+                            ? 'bg-[#34C759]/15 text-[#34C759]'
+                            : 'bg-[#F5F5F7] text-[#1D1D1F] active:bg-black/10'
+                        }`}
+                      >
+                        {batchOfflineProgress ? (
+                          <>
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            <span>
+                              {batchOfflineProgress.current}/{batchOfflineProgress.total}
+                            </span>
+                          </>
+                        ) : allOffline ? (
+                          <>
+                            <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                            <span>{t.savedOffline}</span>
+                          </>
+                        ) : (
+                          <>
+                            <Download className="w-3.5 h-3.5" />
+                            <span>{t.saveOffline}</span>
+                          </>
+                        )}
+                      </button>
+                    );
+                  })()}
+                </div>
+              )}
+
+              {/* Offline Filter Storage Summary Banner */}
+              {listenFilter === 'offline' && (
+                <div className="rounded-2xl bg-[#F5F5F7] p-3.5 border border-black/[0.04] flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-9 h-9 rounded-xl bg-[#34C759]/15 text-[#34C759] flex items-center justify-center shrink-0">
+                      <HardDrive className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <p className="text-xs font-extrabold text-[#1D1D1F] truncate">
+                          {t.offlineReady}
+                        </p>
+                        <span
+                          className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold ${
+                            isOnline
+                              ? 'bg-[#34C759]/15 text-[#34C759]'
+                              : 'bg-[#FF9500]/15 text-[#FF9500]'
+                          }`}
+                        >
+                          {isOnline ? (
+                            <Wifi className="w-2.5 h-2.5" />
+                          ) : (
+                            <WifiOff className="w-2.5 h-2.5" />
+                          )}
+                          <span>{isOnline ? 'Online' : 'Offline'}</span>
+                        </span>
+                      </div>
+                      <p className="text-[11px] font-medium text-[#86868B]">
+                        {offlineIds.length} MP3 · {(offlineBytes / (1024 * 1024)).toFixed(1)} MB
+                      </p>
+                    </div>
+                  </div>
+                  {offlineIds.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => void handleClearOffline()}
+                      className="px-2.5 py-1.5 rounded-xl bg-white text-[#FA243C] text-[11px] font-bold border border-black/[0.06] flex items-center gap-1 shrink-0 active:scale-95"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                      <span>{t.storageClearBtn}</span>
+                    </button>
+                  )}
                 </div>
               )}
 
@@ -660,7 +799,11 @@ export function App() {
               <section className="space-y-1">
                 {listenSongs.length === 0 ? (
                   <p className="text-xs text-[#86868B] text-center py-8">
-                    {listenFilter === 'playlist' ? t.playlistEmpty : t.noSongsFound}
+                    {listenFilter === 'playlist'
+                      ? t.playlistEmpty
+                      : listenFilter === 'offline'
+                      ? t.offlineEmpty
+                      : t.noSongsFound}
                   </p>
                 ) : (
                   <div className="divide-y divide-black/[0.06]">
@@ -779,11 +922,118 @@ export function App() {
                 <ArrowLeft className="w-4 h-4" />
                 <span>{t.tabSettings}</span>
               </button>
+
+              {/* Offline Storage Dashboard Card */}
+              <div className="rounded-3xl bg-gradient-to-br from-[#F5F5F7] to-white p-4 border border-black/[0.06] shadow-xs space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-10 h-10 rounded-2xl bg-[#34C759]/15 text-[#34C759] flex items-center justify-center shrink-0">
+                      <HardDrive className="w-5 h-5" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <h3 className="text-sm font-extrabold text-[#1D1D1F] truncate">
+                          {t.storageCardTitle}
+                        </h3>
+                        <span
+                          className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold ${
+                            isOnline
+                              ? 'bg-[#34C759]/15 text-[#34C759]'
+                              : 'bg-[#FF9500]/15 text-[#FF9500]'
+                          }`}
+                        >
+                          {isOnline ? (
+                            <Wifi className="w-2.5 h-2.5" />
+                          ) : (
+                            <WifiOff className="w-2.5 h-2.5" />
+                          )}
+                          <span>{isOnline ? 'Online' : 'Offline'}</span>
+                        </span>
+                      </div>
+                      <p className="text-xs font-semibold text-[#86868B]">
+                        {offlineSongs.length} MP3 · {(offlineBytes / (1024 * 1024)).toFixed(1)} MB
+                      </p>
+                    </div>
+                  </div>
+                  {offlineIds.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => void handleClearOffline()}
+                      className="px-3 py-1.5 rounded-xl bg-white text-[#FA243C] text-xs font-bold border border-black/[0.06] flex items-center gap-1 shrink-0 active:scale-95"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>{t.storageClearBtn}</span>
+                    </button>
+                  )}
+                </div>
+
+                {batchOfflineProgress && (
+                  <div className="space-y-1.5 pt-1">
+                    <div className="flex items-center justify-between text-[11px] font-bold text-[#FA243C]">
+                      <span className="flex items-center gap-1.5">
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <span>
+                          {t.saveOffline} ({batchOfflineProgress.current}/{batchOfflineProgress.total})
+                        </span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          cancelBatchOfflineRef.current = true;
+                        }}
+                        className="text-[#86868B] underline"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                    <div className="h-1.5 w-full rounded-full bg-black/[0.06] overflow-hidden">
+                      <div
+                        className="h-full bg-[#FA243C] transition-all duration-300"
+                        style={{
+                          width: `${Math.round(
+                            (batchOfflineProgress.current / batchOfflineProgress.total) * 100
+                          )}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* My Playlist */}
               <section className="space-y-2">
-                <div className="bg-[#F5F5F7] rounded-2xl p-3 flex items-center justify-between">
-                  <span className="text-xs font-semibold text-[#1D1D1F]">🎵 {t.myPlaylistTitle}</span>
-                  <span className="text-xs font-bold text-[#FA243C]">{playlistSongs.length}</span>
+                <div className="bg-[#F5F5F7] rounded-2xl p-3 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-semibold text-[#1D1D1F]">♥ {t.myPlaylistTitle}</span>
+                    <span className="text-xs font-bold text-[#FA243C]">{playlistSongs.length}</span>
+                  </div>
+                  {playlistSongs.length > 0 && (() => {
+                    const allPlOffline = playlistSongs.every((s) => offlineIds.includes(s.id));
+                    return (
+                      <button
+                        type="button"
+                        disabled={allPlOffline && !batchOfflineProgress}
+                        onClick={() => void handleBatchSaveOffline(playlistSongs)}
+                        className={`px-2.5 py-1 rounded-xl text-[11px] font-bold flex items-center gap-1 transition ${
+                          allPlOffline
+                            ? 'bg-[#34C759]/15 text-[#34C759]'
+                            : 'bg-white text-[#1D1D1F] border border-black/[0.06]'
+                        }`}
+                      >
+                        {allPlOffline ? (
+                          <>
+                            <Check className="w-3 h-3 stroke-[2.5]" />
+                            <span>{t.savedOffline}</span>
+                          </>
+                        ) : (
+                          <>
+                            <Download className="w-3 h-3" />
+                            <span>{t.saveOffline}</span>
+                          </>
+                        )}
+                      </button>
+                    );
+                  })()}
                 </div>
                 {playlistSongs.length === 0 ? (
                   <p className="text-xs text-[#86868B] text-center py-4">{t.playlistEmpty}</p>
@@ -950,6 +1200,7 @@ export function App() {
             openLyricsSignal={openLyricsSignal}
             isPlaying={player.isPlaying}
             isOffline={offlineIds.includes(player.currentSong.id)}
+            isSavingOffline={savingOfflineId === player.currentSong.id}
             currentTime={player.currentTime}
             duration={player.duration}
             repeatMode={player.repeatMode}

@@ -1,4 +1,4 @@
-import { BookOpen, Heart, Music2, Pause, Play } from 'lucide-react';
+import { BookOpen, Check, Download, Heart, Loader2, Music2, Pause, Play } from 'lucide-react';
 import type { TranslationStrings } from '../i18n/translations';
 import type { Song } from '../types';
 
@@ -40,11 +40,14 @@ export function SongRow({
   rank,
   isCurrent,
   isPlaying,
+  isOffline = false,
+  isSavingOffline = false,
   isInPlaylist = false,
   isKaynar = false,
   t,
   onPlay,
   onOpenLyrics,
+  onToggleOffline,
   onTogglePlaylist,
 }: SongRowProps) {
   const authorLabel = song.is_unknown_author ? t.unknownAuthor : song.artist;
@@ -94,6 +97,11 @@ export function SongRow({
             <p className="text-xs text-[#86868B] truncate">
               {authorLabel} · ▶ {song.play_count.toLocaleString()} {t.plays}
             </p>
+            {isOffline && (
+              <span className="px-1.5 py-0.5 rounded-md bg-[#34C759]/12 text-[#34C759] text-[9px] font-bold shrink-0">
+                ✓ {t.tabOffline}
+              </span>
+            )}
             {isKaynar && (
               <span className="px-1.5 py-0.5 rounded-md bg-[#FA243C]/10 text-[#FA243C] text-[9px] font-bold shrink-0">
                 {t.tabKaynar}
@@ -103,7 +111,7 @@ export function SongRow({
         </div>
       </button>
 
-      <div className="flex items-center gap-1.5 shrink-0">
+      <div className="flex items-center gap-1 shrink-0">
         {onOpenLyrics && (
           <button
             type="button"
@@ -113,6 +121,31 @@ export function SongRow({
             className="w-8 h-8 rounded-full bg-[#F5F5F7] text-[#515154] flex items-center justify-center active:bg-black/10 transition"
           >
             <BookOpen className="w-3.5 h-3.5" />
+          </button>
+        )}
+
+        {onToggleOffline && (
+          <button
+            type="button"
+            disabled={isSavingOffline}
+            onClick={() => onToggleOffline(song)}
+            title={isOffline ? t.savedOffline : t.saveOffline}
+            aria-label={isOffline ? t.savedOffline : t.saveOffline}
+            className={`w-8 h-8 rounded-full flex items-center justify-center transition ${
+              isSavingOffline
+                ? 'bg-[#FA243C]/12 text-[#FA243C]'
+                : isOffline
+                ? 'bg-[#34C759]/15 text-[#34C759]'
+                : 'bg-[#F5F5F7] text-[#86868B] active:bg-black/10'
+            }`}
+          >
+            {isSavingOffline ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : isOffline ? (
+              <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+            ) : (
+              <Download className="w-3.5 h-3.5" />
+            )}
           </button>
         )}
 

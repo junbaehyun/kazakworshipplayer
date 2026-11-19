@@ -3,6 +3,7 @@ import {
   Check,
   ChevronDown,
   Download,
+  Loader2,
   MoreHorizontal,
   Music2,
   Pause,
@@ -28,6 +29,7 @@ interface FullPlayerSheetProps {
   openLyricsSignal?: number;
   isPlaying: boolean;
   isOffline: boolean;
+  isSavingOffline?: boolean;
   currentTime: number;
   duration: number;
   repeatMode: RepeatMode;
@@ -60,6 +62,7 @@ export function FullPlayerSheet({
   openLyricsSignal = 0,
   isPlaying,
   isOffline,
+  isSavingOffline = false,
   currentTime,
   duration,
   repeatMode,
@@ -163,13 +166,36 @@ export function FullPlayerSheet({
           </div>
           <button
             type="button"
+            disabled={isSavingOffline}
             onClick={() => onToggleOffline(song)}
-            className={`px-3 py-1.5 rounded-full text-xs font-semibold shrink-0 flex items-center gap-1 transition ${
-              isOffline ? 'bg-[#34C759]/15 text-[#34C759]' : 'bg-[#F5F5F7] text-[#1D1D1F]'
+            className={`px-3.5 py-2 rounded-full text-xs font-bold shrink-0 flex items-center gap-1.5 border transition ${
+              isSavingOffline
+                ? 'bg-[#FA243C]/10 text-[#FA243C] border-[#FA243C]/20'
+                : isOffline
+                ? 'bg-[#34C759]/15 text-[#34C759] border-[#34C759]/25'
+                : 'bg-[#F5F5F7] text-[#1D1D1F] border-black/[0.06] active:bg-black/10'
             }`}
           >
-            {isOffline ? <Check className="w-3.5 h-3.5" /> : <Download className="w-3.5 h-3.5" />}
-            <span>{isOffline ? t.savedOffline : t.saveOffline}</span>
+            {isSavingOffline ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : isOffline ? (
+              <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+            ) : (
+              <Download className="w-3.5 h-3.5" />
+            )}
+            <span>
+              {isSavingOffline
+                ? lang === 'ko'
+                  ? '저장 중...'
+                  : lang === 'kk'
+                  ? 'Сақталуда...'
+                  : lang === 'ru'
+                  ? 'Сохранение...'
+                  : 'Saving...'
+                : isOffline
+                ? t.savedOffline
+                : t.saveOffline}
+            </span>
           </button>
         </div>
 
