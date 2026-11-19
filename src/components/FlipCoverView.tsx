@@ -115,13 +115,13 @@ export function FlipCoverView({
     <div className="min-h-screen max-h-[100dvh] w-full max-w-[430px] mx-auto bg-white flex flex-col justify-between overflow-hidden select-none">
       {/* Compact Flip 5 Top Bar */}
       <header className="px-3 pt-2.5 pb-2 border-b border-black/[0.06] bg-white/95 backdrop-blur-md flex items-center justify-between gap-1.5 shrink-0">
-        {/* 3-Tab Switcher: Player | Lyrics/Chords | List */}
+        {/* 2-Tab Switcher: Player (Tap card for Lyrics) | List */}
         <div className="inline-flex rounded-xl bg-[#F5F5F7] p-0.5 border border-black/[0.04]">
           <button
             type="button"
             onClick={() => setSubView('player')}
-            className={`px-2.5 py-1 rounded-lg text-[11px] font-extrabold flex items-center gap-1 transition ${
-              subView === 'player'
+            className={`px-3 py-1 rounded-lg text-[11px] font-extrabold flex items-center gap-1 transition ${
+              subView === 'player' || subView === 'lyrics'
                 ? 'bg-[#FA243C] text-white shadow-xs'
                 : 'text-[#1D1D1F]'
             }`}
@@ -131,20 +131,8 @@ export function FlipCoverView({
           </button>
           <button
             type="button"
-            onClick={() => setSubView('lyrics')}
-            className={`px-2.5 py-1 rounded-lg text-[11px] font-extrabold flex items-center gap-1 transition ${
-              subView === 'lyrics'
-                ? 'bg-[#FA243C] text-white shadow-xs'
-                : 'text-[#1D1D1F]'
-            }`}
-          >
-            <BookOpen className="w-3 h-3" />
-            <span>{t.lyricsBtn}</span>
-          </button>
-          <button
-            type="button"
             onClick={() => setSubView('list')}
-            className={`px-2.5 py-1 rounded-lg text-[11px] font-extrabold flex items-center gap-1 transition ${
+            className={`px-3 py-1 rounded-lg text-[11px] font-extrabold flex items-center gap-1 transition ${
               subView === 'list'
                 ? 'bg-[#FA243C] text-white shadow-xs'
                 : 'text-[#1D1D1F]'
@@ -192,9 +180,17 @@ export function FlipCoverView({
 
       {/* SUB-VIEW 1: BIG THUMB-FRIENDLY COVER PLAYER */}
       {subView === 'player' && (
-        <div className="flex-1 min-h-0 flex flex-col justify-between px-4 pt-3 pb-6">
-          {/* Song Card */}
-          <div className="flex items-center gap-3 bg-[#F5F5F7] rounded-2xl p-3 border border-black/[0.04]">
+        <div className="flex-1 min-h-0 flex flex-col justify-between px-4 pt-3 pb-7">
+          {/* Song Card — Tap Card to Open Lyrics & Chords */}
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={() => setSubView('lyrics')}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') setSubView('lyrics');
+            }}
+            className="flex items-center gap-3 bg-[#F5F5F7] active:bg-[#EBEBF0] rounded-2xl p-3.5 border border-black/[0.04] cursor-pointer transition"
+          >
             <div
               className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${gradient} flex items-center justify-center text-white shadow-sm shrink-0`}
             >
@@ -212,6 +208,9 @@ export function FlipCoverView({
                     Key: {song.song_key}
                   </span>
                 )}
+                <span className="px-1.5 py-0.5 rounded-md bg-black/[0.06] text-[#515154] text-[9px] font-bold shrink-0">
+                  {t.lyricsBtn}
+                </span>
               </div>
               <h1 className="text-base font-extrabold text-[#1D1D1F] truncate mt-0.5">
                 {song ? song.title : t.brand}
@@ -221,7 +220,10 @@ export function FlipCoverView({
             {song && (
               <button
                 type="button"
-                onClick={() => onTogglePlaylist(song)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onTogglePlaylist(song);
+                }}
                 aria-label={isCurrentInPlaylist ? t.inPlaylist : t.addToPlaylist}
                 className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 transition ${
                   isCurrentInPlaylist
@@ -316,30 +318,6 @@ export function FlipCoverView({
               ) : (
                 <Repeat className="w-4 h-4" />
               )}
-            </button>
-          </div>
-
-          {/* Bottom Quick Action Bar (padded on right for Flip 5 camera cutout safe zone) */}
-          <div className="flex items-center gap-2 pr-10">
-            <button
-              type="button"
-              onClick={() => setSubView('lyrics')}
-              className="flex-1 py-2.5 px-3 rounded-2xl bg-[#FFF8F6] border border-[#FA243C]/20 text-[#FA243C] text-xs font-extrabold flex items-center justify-center gap-1.5 active:scale-98 transition"
-            >
-              <BookOpen className="w-4 h-4" />
-              <span>
-                {lang === 'ko'
-                  ? '가사 · 악보 코드 보기'
-                  : `${t.lyricsBtn} · Chords`}
-              </span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setSubView('list')}
-              className="py-2.5 px-3.5 rounded-2xl bg-[#F5F5F7] text-[#1D1D1F] text-xs font-extrabold flex items-center justify-center gap-1.5 active:scale-98 transition"
-            >
-              <ListMusic className="w-4 h-4" />
-              <span>{allSongs.length}</span>
             </button>
           </div>
         </div>

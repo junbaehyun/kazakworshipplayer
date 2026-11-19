@@ -3,7 +3,6 @@ import {
   Check,
   ChevronDown,
   Download,
-  MessageSquareQuote,
   MoreHorizontal,
   Music2,
   Pause,
@@ -114,18 +113,24 @@ export function FullPlayerSheet({
         </button>
       </div>
 
-      {/* Center Artwork or Lyrics */}
+      {/* Center Artwork (Tap Card to Show Lyrics) or Lyrics */}
       {!showLyrics ? (
         <div className="my-auto flex flex-col items-center py-2">
-          <div
+          <button
+            type="button"
+            onClick={() => setShowLyrics(true)}
+            aria-label={t.lyricsBtn}
             className={`am-spring ${
               isPlaying ? 'scale-100' : 'scale-90 opacity-90'
-            } w-64 h-64 rounded-3xl bg-gradient-to-br ${gradient} shadow-[0_24px_50px_rgba(250,36,60,0.22)] flex flex-col items-center justify-center text-white p-6 text-center`}
+            } w-64 h-64 rounded-3xl bg-gradient-to-br ${gradient} shadow-[0_24px_50px_rgba(250,36,60,0.22)] flex flex-col items-center justify-center text-white p-6 text-center cursor-pointer active:scale-95`}
           >
             <Music2 className="w-14 h-14 mb-3 opacity-95" />
             <p className="text-base font-bold leading-snug line-clamp-2">{song.title}</p>
             <p className="text-xs opacity-80 mt-1">{t.brand}</p>
-          </div>
+            <span className="mt-3 px-3 py-1 rounded-full bg-white/20 backdrop-blur-xs text-[11px] font-bold">
+              {t.lyricsBtn}
+            </span>
+          </button>
         </div>
       ) : (
         <LyricsView
@@ -212,18 +217,7 @@ export function FullPlayerSheet({
         </div>
 
         {/* Bottom Mode Pills */}
-        <div className="grid grid-cols-3 gap-2 pt-1">
-          <button
-            type="button"
-            onClick={() => setShowLyrics((v) => !v)}
-            className={`py-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-1 transition ${
-              showLyrics ? 'bg-[#FA243C] text-white' : 'bg-[#F5F5F7] text-[#1D1D1F]'
-            }`}
-          >
-            <MessageSquareQuote className="w-3.5 h-3.5" />
-            <span>{t.lyricsBtn}</span>
-          </button>
-
+        <div className="grid grid-cols-2 gap-2 pt-1">
           <button
             type="button"
             onClick={onToggleShuffle}
