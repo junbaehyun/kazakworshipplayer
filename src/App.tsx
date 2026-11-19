@@ -67,6 +67,15 @@ for (const [kaynarId, audioSongId] of Object.entries(BAKHYT_KAYNAR_AUDIO_MAP)) {
 }
 const KAYNAR_AUDIO_IDS = new Set<string>(Object.values(BAKHYT_KAYNAR_AUDIO_MAP));
 
+function isFlipCoverViewport(): boolean {
+  if (typeof window === 'undefined') return false;
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  if (w <= 0 || h <= 0) return false;
+  const ratio = w / h;
+  return (h <= 560 && w <= 760) || (w <= 760 && h <= 780 && ratio >= 0.78 && ratio <= 1.35);
+}
+
 export function App() {
   const [lang, setLang] = useState<Language>(() => {
     const saved = localStorage.getItem('kwp_lang') as Language | null;
@@ -125,10 +134,7 @@ export function App() {
   const [listenFilter, setListenFilter] = useState<ListenFilter>('all');
   const [preferredLyricsVersion, setPreferredLyricsVersion] = useState<'standard' | 'kaynar'>('standard');
   const [openLyricsSignal, setOpenLyricsSignal] = useState(0);
-  const [isCoverMode, setIsCoverMode] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return false;
-    return window.innerHeight <= 460 && window.innerWidth <= 460;
-  });
+  const [isCoverMode, setIsCoverMode] = useState<boolean>(() => isFlipCoverViewport());
   const manualCoverExitRef = useRef(false);
   const wakeLock = useWakeLock(true);
   const pendingSongRef = useRef<Song | null>(null);
@@ -197,7 +203,7 @@ export function App() {
 
   useEffect(() => {
     const onResize = () => {
-      const isCompactSquare = window.innerHeight <= 460 && window.innerWidth <= 460;
+      const isCompactSquare = isFlipCoverViewport();
       if (isCompactSquare && !manualCoverExitRef.current) {
         setIsCoverMode(true);
       } else if (!isCompactSquare) {
@@ -473,7 +479,7 @@ export function App() {
 
   if (isCoverMode) {
     return (
-      <div className="min-h-screen bg-[#EFEFF4] flex justify-center">
+      <div className="fixed inset-0 w-screen h-[100dvh] bg-white overflow-hidden">
         <FlipCoverView
           lang={lang}
           t={t}

@@ -112,7 +112,7 @@ export function FlipCoverView({
     lang === 'ko' ? '목록' : lang === 'kk' ? 'Тізім' : lang === 'ru' ? 'Список' : 'List';
 
   return (
-    <div className="min-h-screen max-h-[100dvh] w-full max-w-[430px] mx-auto bg-white flex flex-col justify-between overflow-hidden select-none">
+    <div className="fixed inset-0 w-screen h-[100dvh] max-w-none bg-white flex flex-col justify-between overflow-hidden select-none z-40">
       {/* Compact Flip 5 Top Bar */}
       <header className="px-3 pt-2.5 pb-2 border-b border-black/[0.06] bg-white/95 backdrop-blur-md flex items-center justify-between gap-1.5 shrink-0">
         {/* 2-Tab Switcher: Player (Tap card for Lyrics) | List */}
