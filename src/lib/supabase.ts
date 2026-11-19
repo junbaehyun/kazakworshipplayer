@@ -2,6 +2,7 @@ import { createClient, type Session } from '@supabase/supabase-js';
 import type { ReportType, Song, SongReport } from '../types';
 import {
   createDemoToneWavBlob,
+  ensureExtraSongsLoaded,
   getLocalReports,
   getLocalSongs,
   getOfflineBlob,
@@ -47,6 +48,7 @@ export const supabase = isSupabaseConfigured
 
 export async function fetchSongs(includePending = false): Promise<{ songs: Song[]; usingLocalFallback: boolean }> {
   if (!supabase) {
+    await ensureExtraSongsLoaded();
     const local = getLocalSongs();
     return {
       songs: includePending ? local : local.filter((s) => s.status === 'published' && s.is_active),
@@ -66,6 +68,7 @@ export async function fetchSongs(includePending = false): Promise<{ songs: Song[
   const { data, error } = await query;
   if (error) {
     console.warn('Supabase kwp_songs fallback to local:', error.message);
+    await ensureExtraSongsLoaded();
     const local = getLocalSongs();
     return {
       songs: includePending ? local : local.filter((s) => s.status === 'published' && s.is_active),

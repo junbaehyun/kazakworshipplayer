@@ -4,7 +4,9 @@ import type { Song, SongReport } from '../types';
 const DB_NAME = 'kwp_offline_db';
 const DB_VERSION = 1;
 const BLOB_STORE = 'offline_blobs';
-const SONGS_KEY = 'kwp_local_songs_v52';
+const PLAY_COUNTS_KEY = 'kwp_play_counts_v1';
+const CUSTOM_SONGS_KEY = 'kwp_custom_songs_v1';
+const DELETED_IDS_KEY = 'kwp_deleted_song_ids_v1';
 const WEEKLY_RESET_KEY = 'kwp_weekly_chart_reset_at';
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 const REPORTS_KEY = 'kwp_local_reports_v1';
@@ -134,6 +136,39 @@ export function createDemoToneWavBlob(freqHz = 261.63, seconds = 6): Blob {
 }
 
 const DEFAULT_LOCAL_SONGS: Song[] = defaultSongsData as Song[];
+let extraRuSongsCache: Song[] = [];
+let extraRuSongsPromise: Promise<Song[]> | null = null;
+
+export async function ensureExtraSongsLoaded(): Promise<Song[]> {
+  if (extraRuSongsCache.length > 0) return extraRuSongsCache;
+  if (!extraRuSongsPromise) {
+    extraRuSongsPromise = import('../data/ruExtraSongs.json')
+      .then((mod) => {
+        extraRuSongsCache = (mod.default ?? mod) as Song[];
+        return extraRuSongsCache;
+      })
+      .catch((err) => {
+        console.warn('Failed to load extra Russian songs:', err);
+        return [];
+      });
+  }
+  return extraRuSongsPromise;
+}
+
+function getBaseCatalog(): Song[] {
+  return extraRuSongsCache.length > 0
+    ? [...DEFAULT_LOCAL_SONGS, ...extraRuSongsCache]
+    : DEFAULT_LOCAL_SONGS;
+}
+
+function readJson<T>(key: string, fallback: T): T {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as T) : fallback;
+  } catch {
+    return fallback;
+  }
+}
 
 export function getWeeklyChartInfo(): { lastResetAt: number; nextResetAt: number } {
   try {
@@ -152,41 +187,84 @@ export function getWeeklyChartInfo(): { lastResetAt: number; nextResetAt: number
 
 export function resetWeeklyChartPlays(): Song[] {
   try {
-    const raw = localStorage.getItem(SONGS_KEY);
-    const base = raw ? (JSON.parse(raw) as Song[]) : DEFAULT_LOCAL_SONGS;
-    const reset = base.map((s) => ({ ...s, play_count: 0 }));
-    localStorage.setItem(SONGS_KEY, JSON.stringify(reset));
+    localStorage.setItem(PLAY_COUNTS_KEY, '{}');
     localStorage.setItem(WEEKLY_RESET_KEY, String(Date.now()));
-    return reset;
   } catch {
-    return DEFAULT_LOCAL_SONGS;
+    // ignore storage errors
   }
+  return getLocalSongs();
 }
 
 export function getLocalSongs(): Song[] {
+  const base = getBaseCatalog();
   try {
-    const raw = localStorage.getItem(SONGS_KEY);
-    if (!raw) {
-      localStorage.setItem(SONGS_KEY, JSON.stringify(DEFAULT_LOCAL_SONGS));
-      localStorage.setItem(WEEKLY_RESET_KEY, String(Date.now()));
-      return DEFAULT_LOCAL_SONGS;
-    }
-    const songs = JSON.parse(raw) as Song[];
     const { lastResetAt } = getWeeklyChartInfo();
     if (Date.now() - lastResetAt >= WEEK_MS) {
-      const reset = songs.map((s) => ({ ...s, play_count: 0 }));
-      localStorage.setItem(SONGS_KEY, JSON.stringify(reset));
+      localStorage.setItem(PLAY_COUNTS_KEY, '{}');
       localStorage.setItem(WEEKLY_RESET_KEY, String(Date.now()));
-      return reset;
     }
-    return songs;
+
+    const playCounts = readJson<Record<string, number>>(PLAY_COUNTS_KEY, {});
+    const customSongs = readJson<Song[]>(CUSTOM_SONGS_KEY, []);
+    const deletedIds = new Set(readJson<string[]>(DELETED_IDS_KEY, []));
+
+    const customById = new Map(customSongs.map((s) => [s.id, s]));
+    const baseIds = new Set(base.map((s) => s.id));
+
+    const mergedCustom = customSongs
+      .filter((s) => !baseIds.has(s.id) && !deletedIds.has(s.id))
+      .map((s) => ({ ...s, play_count: playCounts[s.id] ?? s.play_count ?? 0 }));
+
+    const mergedBase = base
+      .filter((s) => !deletedIds.has(s.id))
+      .map((s) => {
+        const override = customById.get(s.id);
+        const baseSong = override ?? s;
+        const count = playCounts[s.id];
+        return count !== undefined ? { ...baseSong, play_count: count } : baseSong;
+      });
+
+    return [...mergedCustom, ...mergedBase];
   } catch {
-    return DEFAULT_LOCAL_SONGS;
+    return base;
   }
 }
 
 export function saveLocalSongs(songs: Song[]): void {
-  localStorage.setItem(SONGS_KEY, JSON.stringify(songs));
+  const base = getBaseCatalog();
+  const baseById = new Map(base.map((s) => [s.id, s]));
+  const nextIds = new Set(songs.map((s) => s.id));
+
+  const playCounts: Record<string, number> = {};
+  const customSongs: Song[] = [];
+
+  for (const s of songs) {
+    if ((s.play_count || 0) > 0) {
+      playCounts[s.id] = s.play_count;
+    }
+    const orig = baseById.get(s.id);
+    if (!orig) {
+      customSongs.push(s);
+    } else if (
+      s.status !== orig.status ||
+      s.is_active !== orig.is_active ||
+      s.title !== orig.title ||
+      s.lyrics !== orig.lyrics ||
+      s.artist !== orig.artist
+    ) {
+      customSongs.push(s);
+    }
+  }
+
+  const deletedIds = base.filter((s) => !nextIds.has(s.id)).map((s) => s.id);
+
+  try {
+    localStorage.setItem(PLAY_COUNTS_KEY, JSON.stringify(playCounts));
+    localStorage.setItem(CUSTOM_SONGS_KEY, JSON.stringify(customSongs));
+    localStorage.setItem(DELETED_IDS_KEY, JSON.stringify(deletedIds));
+  } catch (err) {
+    console.warn('saveLocalSongs storage warning:', err);
+  }
 }
 
 export function getLocalReports(): SongReport[] {
