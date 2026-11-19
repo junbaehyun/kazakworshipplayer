@@ -6,12 +6,19 @@ import {
   ChevronRight,
   Copy,
   Heart,
+  Loader2,
   Music2,
   Pause,
   Play,
   X,
 } from 'lucide-react';
 import type { KaynarSong } from '../data/bakhytKaynarSongs';
+import {
+  getCachedRussianTranslation,
+  isRussianLyrics,
+  translateRussianLinesToKorean,
+  transliterateRussianToKorean,
+} from '../lib/russianKorean';
 import type { Language } from '../types';
 
 interface Stanza {
@@ -20,6 +27,8 @@ interface Stanza {
 }
 
 interface LyricsViewProps {
+  songId?: string;
+  songLang?: Language;
   lyrics: string;
   songKey?: string | null;
   capo?: number | null;
@@ -139,11 +148,22 @@ function parseStanzas(raw: string): Stanza[] {
 
 function formatSectionTag(tag: string, lang: Language): { label: string; isChorus: boolean } {
   const lower = tag.toLowerCase();
+  if (lower.startsWith('припев')) {
+    return {
+      label: lang === 'ko' ? '후렴 (Припев)' : 'Припев',
+      isChorus: true,
+    };
+  }
+  if (lower.startsWith('предприпев') && lang === 'ko') {
+    return { label: '프리코러스', isChorus: false };
+  }
+  if (lower.startsWith('бридж') && lang === 'ko') {
+    return { label: '브릿지', isChorus: false };
+  }
   const isChorus =
     lower.startsWith('қр') ||
     lower === 'chorus' ||
-    lower === '후렴' ||
-    lower.startsWith('припев');
+    lower === '후렴';
   if (isChorus) {
     return {
       label: lang === 'ko' ? '후렴 (Қр.)' : 'Қр.',
@@ -157,6 +177,8 @@ function formatSectionTag(tag: string, lang: Language): { label: string; isChoru
 }
 
 export function LyricsView({
+  songId,
+  songLang,
   lyrics,
   songKey = null,
   capo = null,
@@ -191,6 +213,11 @@ export function LyricsView({
   const [version, setVersion] = useState<'standard' | 'kaynar'>(
     kaynarSong ? defaultVersion : 'standard'
   );
+  const [showKoReading, setShowKoReading] = useState(true);
+  const [showKoTranslation, setShowKoTranslation] = useState(true);
+  const [ruTranslations, setRuTranslations] = useState<Record<string, string>>({});
+  const [isTranslatingRu, setIsTranslatingRu] = useState(false);
+  const [translationError, setTranslationError] = useState(false);
   const lastManualScrollRef = useRef(0);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const stanzaRefs = useRef<(HTMLButtonElement | null)[]>([]);
@@ -207,6 +234,67 @@ export function LyricsView({
   const activeVersion = kaynarSong ? version : 'standard';
 
   const stanzas = useMemo(() => parseStanzas(lyrics), [lyrics]);
+  const isRussian = useMemo(
+    () => isRussianLyrics(songLang, songId, lyrics),
+    [songLang, songId, lyrics]
+  );
+  const showRussianKoTools = lang === 'ko' && isRussian && activeVersion === 'standard';
+  const cacheKey = songId || title;
+
+  const uniquePlainLines = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          stanzas
+            .flatMap((st) => st.lines.map((l) => stripChords(l).trim()))
+            .filter(Boolean)
+        )
+      ),
+    [stanzas]
+  );
+
+  useEffect(() => {
+    setTranslationError(false);
+    if (!showRussianKoTools || !showKoTranslation || uniquePlainLines.length === 0) {
+      return;
+    }
+
+    const cached = getCachedRussianTranslation(cacheKey);
+    if (cached) {
+      setRuTranslations(cached);
+    } else {
+      setRuTranslations({});
+    }
+
+    const hasMissing = uniquePlainLines.some((line) => !cached?.[line]);
+    if (!hasMissing) {
+      setIsTranslatingRu(false);
+      return;
+    }
+
+    let cancelled = false;
+    setIsTranslatingRu(true);
+    translateRussianLinesToKorean(cacheKey, uniquePlainLines)
+      .then((result) => {
+        if (!cancelled) {
+          setRuTranslations(result);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setTranslationError(true);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsTranslatingRu(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [cacheKey, showRussianKoTools, showKoTranslation, uniquePlainLines]);
   const kaynarSections = useMemo(() => kaynarSong?.sections ?? [], [kaynarSong]);
   const totalBlocks = activeVersion === 'kaynar' ? kaynarSections.length : stanzas.length;
 
@@ -274,14 +362,23 @@ export function LyricsView({
     return stanzas
       .map((st) => {
         const body = st.lines
-          .map((l) => (showChords ? l : stripChords(l)))
+          .map((l) => {
+            const lineText = showChords ? l : stripChords(l);
+            if (!lineText) return '';
+            if (showRussianKoTools && showKoTranslation) {
+              const plain = stripChords(l).trim();
+              const tr = ruTranslations[plain];
+              return tr ? `${lineText}\n${tr}` : lineText;
+            }
+            return lineText;
+          })
           .filter(Boolean)
           .join('\n');
         return st.tag ? `[${st.tag}]\n${body}` : body;
       })
       .join('\n\n')
       .trim();
-  }, [activeVersion, kaynarSong, lang, showChords, stanzas]);
+  }, [activeVersion, kaynarSong, lang, ruTranslations, showChords, showKoTranslation, showRussianKoTools, stanzas]);
 
   const handleCopy = async () => {
     if (!copyableText) return;
@@ -511,6 +608,33 @@ export function LyricsView({
           >
             {autoScrollLabel} {autoScrollSpeed > 0 ? `${autoScrollSpeed}x` : ''}
           </button>
+          {showRussianKoTools && (
+            <>
+              <button
+                type="button"
+                onClick={() => setShowKoReading((v) => !v)}
+                className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold border transition ${
+                  showKoReading
+                    ? 'bg-sky-600 text-white border-sky-600'
+                    : 'bg-white text-[#515154] border-black/10'
+                }`}
+              >
+                발음
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowKoTranslation((v) => !v)}
+                className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold border inline-flex items-center gap-1 transition ${
+                  showKoTranslation
+                    ? 'bg-violet-600 text-white border-violet-600'
+                    : 'bg-white text-[#515154] border-black/10'
+                }`}
+              >
+                {isTranslatingRu && <Loader2 className="w-3 h-3 animate-spin" />}
+                <span>한국어 번역</span>
+              </button>
+            </>
+          )}
         </div>
 
         {activeHasChords && showChords && (
@@ -692,7 +816,7 @@ export function LyricsView({
                     const plainLine = stripChords(line);
 
                     return (
-                      <div key={lineIdx} className="px-3.5 py-2.5">
+                      <div key={lineIdx} className="px-3.5 py-2.5 space-y-1">
                         {chordSegments ? (
                           <div
                             className={`flex flex-wrap items-end leading-snug text-[#1D1D1F] ${FONT_SIZE_CLASSES[fontStep]}`}
@@ -715,6 +839,26 @@ export function LyricsView({
                           >
                             {plainLine}
                           </p>
+                        )}
+                        {showRussianKoTools && showKoReading && plainLine.trim() && (
+                          <p className="text-xs font-medium text-sky-700">
+                            {transliterateRussianToKorean(plainLine)}
+                          </p>
+                        )}
+                        {showRussianKoTools && showKoTranslation && plainLine.trim() && (
+                          ruTranslations[plainLine.trim()] ? (
+                            <p className="text-xs text-[#6E6E73]">
+                              {ruTranslations[plainLine.trim()]}
+                            </p>
+                          ) : isTranslatingRu ? (
+                            <p className="text-[11px] text-[#86868B] animate-pulse">
+                              번역 불러오는 중...
+                            </p>
+                          ) : translationError && idx === 0 && lineIdx === 0 ? (
+                            <p className="text-[11px] text-[#86868B]">
+                              번역을 불러오지 못했습니다
+                            </p>
+                          ) : null
                         )}
                       </div>
                     );

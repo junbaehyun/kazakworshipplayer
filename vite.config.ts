@@ -2,11 +2,32 @@ import { Readable } from 'node:stream';
 import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
+import translateLyricsHandler from './api/translate-lyrics.js';
 
-function localAudioProxyPlugin(): Plugin {
+function localApiProxyPlugin(): Plugin {
   return {
-    name: 'local-audio-proxy',
+    name: 'local-api-proxy',
     configureServer(server) {
+      server.middlewares.use('/api/translate-lyrics', async (req, res) => {
+        try {
+          const chunks: Buffer[] = [];
+          for await (const chunk of req) chunks.push(Buffer.from(chunk));
+          const bodyText = Buffer.concat(chunks).toString('utf8');
+          const webReq = new Request('http://localhost/api/translate-lyrics', {
+            method: req.method || 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: req.method === 'POST' ? bodyText : undefined,
+          });
+          const webRes = await translateLyricsHandler(webReq);
+          res.statusCode = webRes.status;
+          webRes.headers.forEach((v, k) => res.setHeader(k, v));
+          res.end(await webRes.text());
+        } catch {
+          res.statusCode = 500;
+          res.end(JSON.stringify({ error: 'Local translate proxy error' }));
+        }
+      });
+
       server.middlewares.use('/api/proxy-audio', async (req, res) => {
         const reqUrl = new URL(req.url || '', 'http://localhost');
         const rawUrl = reqUrl.searchParams.get('url');
@@ -42,7 +63,7 @@ function localAudioProxyPlugin(): Plugin {
 }
 
 export default defineConfig({
-  plugins: [react(), tailwindcss(), localAudioProxyPlugin()],
+  plugins: [react(), tailwindcss(), localApiProxyPlugin()],
   build: {
     rollupOptions: {
       output: {

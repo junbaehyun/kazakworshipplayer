@@ -1332,6 +1332,8 @@ export function App() {
             <div className="fixed inset-y-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] z-50 bg-gradient-to-b from-[#FFF5F6] via-white to-[#F5F5F7] flex flex-col px-3.5 pt-3 pb-4">
               <Suspense fallback={null}>
                 <LyricsView
+                  songId={readerSong.id}
+                  songLang={readerSong.lang}
                   lyrics={readerSong.lyrics ?? ''}
                   songKey={readerSong.song_key ?? readerKaynar?.songKey ?? null}
                   capo={readerSong.capo ?? readerKaynar?.capo ?? null}

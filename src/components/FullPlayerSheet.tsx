@@ -143,6 +143,8 @@ export function FullPlayerSheet({
         </div>
       ) : (
         <LyricsView
+          songId={song.id}
+          songLang={song.lang}
           lyrics={song.lyrics ?? ''}
           songKey={song.song_key ?? kaynarSong?.songKey ?? null}
           capo={song.capo ?? kaynarSong?.capo ?? null}
