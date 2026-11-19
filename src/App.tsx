@@ -8,11 +8,9 @@ import {
   HardDrive,
   Loader2,
   Music,
-  Play,
   Search,
   Settings,
   Share2,
-  Shuffle,
   Trash2,
   Wifi,
   WifiOff,
@@ -171,8 +169,9 @@ export function App() {
   const handleToggleKaynarTab = (next: boolean) => {
     setShowKaynarTab(next);
     localStorage.setItem(DEV_KAYNAR_KEY, String(next));
-    if (!next && tab === 'kaynar') {
-      setTab('listen');
+    if (!next) {
+      if (tab === 'kaynar') setTab('listen');
+      if (listenFilter === 'kaynar') setListenFilter('all');
     }
   };
 
@@ -296,16 +295,6 @@ export function App() {
     if (!q) return topChartSongs;
     return topChartSongs.filter((s) => (searchTextById.get(s.id) ?? '').includes(q));
   }, [topChartSongs, searchTextById, search]);
-
-  const kaynarPlayableCount = useMemo(
-    () => topChartSongs.filter((s) => KAYNAR_AUDIO_IDS.has(s.id)).length,
-    [topChartSongs]
-  );
-
-  const ruSongsCount = useMemo(
-    () => topChartSongs.filter((s) => s.lang === 'ru' || s.id.startsWith('song-ru-')).length,
-    [topChartSongs]
-  );
 
   const listenSongs = useMemo(() => {
     let base: Song[];
@@ -660,7 +649,7 @@ export function App() {
       {/* Mobile-Only Day-Theme App Shell (max-w-[430px]) */}
       <div className="w-full max-w-[430px] min-h-screen bg-white relative flex flex-col shadow-[0_0_50px_rgba(0,0,0,0.08)]">
         {/* Sticky Frosted Header */}
-        <header className="sticky top-0 z-20 bg-white/85 backdrop-blur-xl px-5 pt-4 pb-2.5 border-b border-black/[0.05]">
+        <header className="sticky top-0 z-20 bg-white/75 backdrop-blur-2xl backdrop-saturate-150 px-5 pt-4 pb-2.5 border-b border-black/[0.05]">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-1.5">
               <span className="w-6 h-6 rounded-lg bg-[#FA243C] text-white flex items-center justify-center text-xs font-bold shadow-xs">
@@ -730,16 +719,16 @@ export function App() {
             <>
               <InstallPromptBanner t={t} />
 
-              {/* Filter Chips (All | Бақыт қайнар | Русский | My Playlist | Offline) */}
+              {/* Filter Chips (All | My Playlist | Русский | [Бақыт қайнар] | Offline) */}
               <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
                 {(
                   [
-                    { id: 'all', label: t.filterAll, count: topChartSongs.length },
-                    { id: 'kaynar', label: t.tabKaynar, count: kaynarPlayableCount },
-                    { id: 'ru', label: 'Русский', count: ruSongsCount },
-                    { id: 'playlist', label: t.myPlaylistTitle, count: playlistSongs.length },
-                    { id: 'offline', label: t.tabOffline, count: offlineIds.length },
-                  ] as const
+                    { id: 'all', label: t.filterAll },
+                    { id: 'playlist', label: `♥ ${t.myPlaylistTitle}` },
+                    { id: 'ru', label: 'Русский' },
+                    ...(showKaynarTab ? [{ id: 'kaynar' as const, label: t.tabKaynar }] : []),
+                    { id: 'offline', label: t.tabOffline },
+                  ] as { id: ListenFilter; label: string }[]
                 ).map((chip) => {
                   const active = listenFilter === chip.id;
                   return (
@@ -747,20 +736,13 @@ export function App() {
                       key={chip.id}
                       type="button"
                       onClick={() => setListenFilter(chip.id)}
-                      className={`px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap flex items-center gap-1.5 transition shrink-0 ${
+                      className={`px-3.5 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition shrink-0 ${
                         active
                           ? 'bg-[#FA243C] text-white shadow-xs'
                           : 'bg-[#F5F5F7] text-[#1D1D1F] active:bg-black/10'
                       }`}
                     >
-                      <span>{chip.label}</span>
-                      <span
-                        className={`text-[10px] font-extrabold tabular-nums ${
-                          active ? 'text-white/85' : 'text-[#86868B]'
-                        }`}
-                      >
-                        {chip.count}
-                      </span>
+                      {chip.label}
                     </button>
                   );
                 })}
@@ -789,97 +771,69 @@ export function App() {
                 </div>
               )}
 
-              {/* Play / Shuffle Action Bar */}
-              {listenSongs.length > 0 && (
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    disabled={playableListenSongs.length === 0}
-                    onClick={() => {
-                      setPreferredLyricsVersion(listenFilter === 'kaynar' ? 'kaynar' : 'standard');
-                      if (playableListenSongs[0]) void player.playSong(playableListenSongs[0]);
-                    }}
-                    className="flex-1 py-2.5 rounded-xl bg-[#FA243C] text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs active:opacity-85 transition disabled:opacity-40"
-                  >
-                    <Play className="w-3.5 h-3.5 fill-white" />
-                    <span>{t.playBtn}</span>
-                  </button>
-                  <button
-                    type="button"
-                    disabled={playableListenSongs.length === 0}
-                    onClick={() => {
-                      setPreferredLyricsVersion(listenFilter === 'kaynar' ? 'kaynar' : 'standard');
-                      if (!player.isShuffle) player.toggleShuffle();
-                      const pick =
-                        playableListenSongs[
-                          Math.floor(Math.random() * playableListenSongs.length)
-                        ];
-                      if (pick) void player.playSong(pick);
-                    }}
-                    className="flex-1 py-2.5 rounded-xl bg-[#F5F5F7] text-[#FA243C] text-xs font-bold flex items-center justify-center gap-1.5 active:bg-black/10 transition disabled:opacity-40"
-                  >
-                    <Shuffle className="w-3.5 h-3.5" />
-                    <span>{t.shuffleBtn}</span>
-                  </button>
-                  {listenFilter === 'playlist' && playlistSongs.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => void handleShareSetlistLyrics()}
-                      className="px-3 py-2.5 rounded-xl bg-[#F5F5F7] text-[#1D1D1F] text-xs font-bold flex items-center justify-center gap-1 shrink-0 active:bg-black/10 transition"
-                    >
-                      {copiedSetlist ? (
-                        <Check className="w-3.5 h-3.5 text-[#34C759]" />
-                      ) : (
-                        <Share2 className="w-3.5 h-3.5 text-[#FA243C]" />
-                      )}
-                      <span>
-                        {copiedSetlist
-                          ? t.addedAllToPlaylist
-                          : lang === 'ko'
-                          ? '가사 공유'
-                          : 'Share'}
-                      </span>
-                    </button>
-                  )}
-                  {(listenFilter === 'playlist' || listenFilter === 'kaynar') && (() => {
-                    const allOffline = listenSongs.every((s) => offlineIds.includes(s.id));
-                    return (
+              {/* Playlist / Kaynar Utility Strip (Share & Offline Save) */}
+              {(listenFilter === 'playlist' || (showKaynarTab && listenFilter === 'kaynar')) &&
+                listenSongs.length > 0 && (
+                  <div className="flex items-center gap-2">
+                    {listenFilter === 'playlist' && playlistSongs.length > 0 && (
                       <button
                         type="button"
-                        onClick={() => void handleBatchSaveOffline(listenSongs)}
-                        disabled={allOffline && !batchOfflineProgress}
-                        title={allOffline ? t.savedOffline : t.saveOffline}
-                        className={`px-3 py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1 shrink-0 transition ${
-                          batchOfflineProgress
-                            ? 'bg-[#FA243C]/12 text-[#FA243C]'
-                            : allOffline
-                            ? 'bg-[#34C759]/15 text-[#34C759]'
-                            : 'bg-[#F5F5F7] text-[#1D1D1F] active:bg-black/10'
-                        }`}
+                        onClick={() => void handleShareSetlistLyrics()}
+                        className="flex-1 px-3 py-2 rounded-xl bg-[#F5F5F7] text-[#1D1D1F] text-xs font-bold flex items-center justify-center gap-1.5 active:bg-black/10 transition"
                       >
-                        {batchOfflineProgress ? (
-                          <>
-                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                            <span>
-                              {batchOfflineProgress.current}/{batchOfflineProgress.total}
-                            </span>
-                          </>
-                        ) : allOffline ? (
-                          <>
-                            <Check className="w-3.5 h-3.5 stroke-[2.5]" />
-                            <span>{t.savedOffline}</span>
-                          </>
+                        {copiedSetlist ? (
+                          <Check className="w-3.5 h-3.5 text-[#34C759]" />
                         ) : (
-                          <>
-                            <Download className="w-3.5 h-3.5" />
-                            <span>{t.saveOffline}</span>
-                          </>
+                          <Share2 className="w-3.5 h-3.5 text-[#FA243C]" />
                         )}
+                        <span>
+                          {copiedSetlist
+                            ? t.addedAllToPlaylist
+                            : lang === 'ko'
+                            ? '가사 공유'
+                            : 'Share'}
+                        </span>
                       </button>
-                    );
-                  })()}
-                </div>
-              )}
+                    )}
+                    {(() => {
+                      const allOffline = listenSongs.every((s) => offlineIdSet.has(s.id));
+                      return (
+                        <button
+                          type="button"
+                          onClick={() => void handleBatchSaveOffline(listenSongs)}
+                          disabled={allOffline && !batchOfflineProgress}
+                          title={allOffline ? t.savedOffline : t.saveOffline}
+                          className={`flex-1 px-3 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition ${
+                            batchOfflineProgress
+                              ? 'bg-[#FA243C]/12 text-[#FA243C]'
+                              : allOffline
+                              ? 'bg-[#34C759]/15 text-[#34C759]'
+                              : 'bg-[#F5F5F7] text-[#1D1D1F] active:bg-black/10'
+                          }`}
+                        >
+                          {batchOfflineProgress ? (
+                            <>
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              <span>
+                                {batchOfflineProgress.current}/{batchOfflineProgress.total}
+                              </span>
+                            </>
+                          ) : allOffline ? (
+                            <>
+                              <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                              <span>{t.savedOffline}</span>
+                            </>
+                          ) : (
+                            <>
+                              <Download className="w-3.5 h-3.5" />
+                              <span>{t.saveOffline}</span>
+                            </>
+                          )}
+                        </button>
+                      );
+                    })()}
+                  </div>
+                )}
 
               {/* Offline Filter Storage Summary Banner */}
               {listenFilter === 'offline' && (
@@ -1306,9 +1260,9 @@ export function App() {
           onToggleShuffle={player.toggleShuffle}
         />
 
-        {/* Bottom Mobile Tab Bar (Shown only when Бақыт қайнар menu is enabled in Dev Settings) */}
+        {/* Bottom Mobile Tab Bar (Shown only when Бақыт қайнар menu is enabled in Settings) */}
         {showKaynarTab && (
-          <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] h-[56px] bg-white/95 backdrop-blur-xl border-t border-black/[0.06] z-30 grid grid-cols-2 px-1">
+          <nav className="fixed bottom-[calc(10px+env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 w-[calc(100%-24px)] max-w-[406px] h-[54px] rounded-[27px] liquid-glass z-30 grid grid-cols-2 p-1 gap-1">
             {(
               [
                 { id: 'listen', icon: Music, label: t.tabListen },
@@ -1321,8 +1275,8 @@ export function App() {
                   key={id}
                   type="button"
                   onClick={() => setTab(id)}
-                  className={`flex flex-col items-center justify-center gap-0.5 min-w-0 px-0.5 ${
-                    active ? 'text-[#FA243C]' : 'text-[#86868B]'
+                  className={`flex flex-col items-center justify-center gap-0.5 min-w-0 px-0.5 rounded-[22px] transition ${
+                    active ? 'bg-[#FA243C]/12 text-[#FA243C]' : 'text-[#6E6E73]'
                   }`}
                 >
                   <Icon className="w-4 h-4 shrink-0" />
