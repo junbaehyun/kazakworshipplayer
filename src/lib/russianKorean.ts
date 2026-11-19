@@ -15,11 +15,16 @@ interface RuKoCacheStore {
 
 const VOWEL_JUNG: Record<string, number> = {
   а: 0, // ㅏ
+  ә: 1, // ㅐ (Kazakh)
   э: 5, // ㅔ
   о: 8, // ㅗ
+  ө: 11, // ㅚ (Kazakh)
   у: 13, // ㅜ
+  ұ: 13, // ㅜ (Kazakh)
+  ү: 16, // ㅟ (Kazakh)
   ы: 18, // ㅡ
   и: 20, // ㅣ
+  і: 20, // ㅣ (Kazakh)
   я: 2, // ㅑ
   е: 7, // ㅖ (becomes 5 ㅔ after consonant or soft cluster depending on context)
   ё: 12, // ㅛ
@@ -28,12 +33,14 @@ const VOWEL_JUNG: Record<string, number> = {
 
 const CONSONANT_CHO: Record<string, number> = {
   г: 0, // ㄱ
+  ғ: 0, // ㄱ (Kazakh)
   н: 2, // ㄴ
+  ң: 2, // ㄴ onset / ㅇ coda (Kazakh)
   д: 3, // ㄷ
-  т: 4, // ㄸ (closer to unaspirated Russian т than aspirated ㅌ)
+  т: 4, // ㄸ
   л: 5, // ㄹ
   р: 5, // ㄹ
-  м: 6, // м
+  м: 6, // ㅁ
   б: 7, // ㅂ
   в: 7, // ㅂ
   с: 9, // ㅅ
@@ -42,9 +49,11 @@ const CONSONANT_CHO: Record<string, number> = {
   ц: 14, // ㅊ
   ч: 14, // ㅊ
   к: 15, // ㅋ
+  қ: 15, // ㅋ (Kazakh)
   п: 17, // ㅍ
   ф: 17, // ㅍ
   х: 18, // ㅎ
+  һ: 18, // ㅎ (Kazakh)
   ш: 9, // ㅅ (with ㅠ/ㅡ)
   щ: 9, // ㅅ (with ㅣ/ㅠ)
 };
@@ -54,16 +63,21 @@ const CODA_JONG: Record<string, number> = {
   л: 8, // ㄹ
   м: 16, // ㅁ
   н: 4, // ㄴ
+  ң: 21, // ㅇ (Kazakh)
   к: 1, // ㄱ (only for doubled кк)
   п: 17, // ㅂ (only for doubled пп)
 };
+
+const CYRILLIC_WORD_RE = /[А-Яа-яЁёӘәҒғҚқҢңӨөҰұҮүҺһІі]+/g;
+const TRIM_NON_CYRILLIC_RE =
+  /^[^А-Яа-яЁёӘәҒғҚқҢңӨөҰұҮүҺһІі]+|[^А-Яа-яЁёӘәҒғҚқҢңӨөҰұҮүҺһІі]+$/g;
 
 function composeHangul(cho: number, jung: number, jong = 0): string {
   return String.fromCharCode(0xac00 + (cho * 21 + jung) * 28 + jong);
 }
 
 function isCyrillicLetter(ch: string): boolean {
-  return /[А-Яа-яЁё]/.test(ch);
+  return /[А-Яа-яЁёӘәҒғҚқҢңӨөҰұҮүҺһІі]/.test(ch);
 }
 
 function transliterateWord(word: string): string {
@@ -106,13 +120,13 @@ function transliterateWord(word: string): string {
       if (ch === 'е' && i > 0 && lower[i - 1] === 'ь') {
         jung = 7; // ㅖ
       }
-      // Check if next consonant can close this syllable cleanly (н, м, л before consonant/end)
+      // Check if next consonant can close this syllable cleanly (н, м, л, ң before consonant/end)
       let jong = 0;
       const next = lower[i + 1];
       const next2 = lower[i + 2];
       if (
         next &&
-        (next === 'н' || next === 'м' || next === 'л') &&
+        (next === 'н' || next === 'м' || next === 'л' || next === 'ң') &&
         (!next2 || (!isVowel(next2) && next2 !== 'ь' && next2 !== 'ъ' && next2 !== 'й') || next2 === next)
       ) {
         jong = CODA_JONG[next];
@@ -153,7 +167,7 @@ function transliterateWord(word: string): string {
         const afterV2 = lower[j + 2];
         if (
           afterV &&
-          (afterV === 'н' || afterV === 'м' || afterV === 'л') &&
+          (afterV === 'н' || afterV === 'м' || afterV === 'л' || afterV === 'ң') &&
           (!afterV2 || !isVowel(afterV2) || afterV2 === afterV) &&
           afterV2 !== 'ь' &&
           afterV2 !== 'й'
@@ -217,7 +231,7 @@ export function isRussianLyrics(
 
 export function transliterateRussianToKorean(input: string): string {
   if (!input) return '';
-  return input.replace(/[А-Яа-яЁё]+/g, (word) =>
+  return input.replace(CYRILLIC_WORD_RE, (word) =>
     isCyrillicLetter(word[0]) ? transliterateWord(word) : word
   );
 }
@@ -303,9 +317,12 @@ const WORD_CACHE_KEY = 'kwp_ru_word_cache_v1';
 const VOCAB_KEY = 'kwp_ru_vocab_v1';
 const MAX_CACHED_WORDS = 500;
 
+export type StudyWordLang = 'ru' | 'kk';
+
 export interface RussianWordInfo {
   word: string;
   normalized: string;
+  sourceLang?: StudyWordLang;
   readingKo: string;
   romanization?: string;
   meaning: string;
@@ -431,10 +448,107 @@ const WORSHIP_RU_DICT: Record<string, { meaning: string; pos?: string; note?: st
   живой: { meaning: '살아 계신, 생수의', pos: '형용사', note: 'живая вода = 생수' },
 };
 
+const WORSHIP_KK_DICT: Record<string, { meaning: string; pos?: string; note?: string }> = {
+  құдай: { meaning: '하나님', pos: '명사', note: '원형 Құдай (창조주 하나님)' },
+  құдайым: { meaning: '나의 하나님', pos: '명사', note: 'Құдай + 1인칭 소유어미 -ым' },
+  құдайға: { meaning: '하나님께', pos: '명사', note: '여격 어미 -ға (~에게)' },
+  тәңір: { meaning: '주님, 여호와', pos: '명사', note: '성경에서 주(Lord)를 나타내는 칭호' },
+  тәңірім: { meaning: '나의 주님', pos: '명사', note: 'Тәңір + 1인칭 소유어미 -ім' },
+  тәңірі: { meaning: '주님(그분의/여호와)', pos: '명사', note: 'Тәңір의 소유/존칭 형태' },
+  ие: { meaning: '주님, 주인', pos: '명사', note: '예: Иеміз Иса (우리 주 예수)' },
+  ием: { meaning: '나의 주님', pos: '명사', note: 'Ие + 1인칭 소유어미 -м' },
+  иеміз: { meaning: '우리 주님', pos: '명사', note: 'Ие + 1인칭 복수 소유어미 -міз' },
+  иса: { meaning: '예수님', pos: '고유명사', note: 'Иса Мәсіх = 예수 그리스도' },
+  исаны: { meaning: '예수님을', pos: '고유명사', note: '목적격 어미 -ны' },
+  исаға: { meaning: '예수님께', pos: '고유명사', note: '여격 어미 -ға' },
+  мәсіх: { meaning: '그리스도, 메시아', pos: '명사', note: '기름 부음 받은 자' },
+  мәсіхтің: { meaning: '그리스도의', pos: '명사', note: '속격 어미 -тің (~의)' },
+  әке: { meaning: '아버지', pos: '명사', note: '하늘 아버지 (Көктегі Әке)' },
+  әкем: { meaning: '나의 아버지', pos: '명사', note: 'Әке + -м' },
+  әкеміз: { meaning: '우리 아버지', pos: '명사', note: 'Әке + -міз' },
+  киелі: { meaning: '거룩한, 성스러운', pos: '형용사', note: 'Киелі Рух = 성령' },
+  рух: { meaning: '영, 성령', pos: '명사', note: 'Киелі Рух = 성령님' },
+  рухың: { meaning: '주의 영, 당신의 영', pos: '명사', note: '2인칭 소유어미 -ың' },
+  рухы: { meaning: '그분의 영', pos: '명사', note: '3인칭 소유어미 -ы' },
+  мадақ: { meaning: '찬양, 찬송', pos: '명사', note: '마음 다해 올려 드리는 찬양' },
+  мадақтау: { meaning: '찬양함, 찬양하다', pos: '동사', note: '동명사/원형 (Мадақтау әні = 찬양곡)' },
+  мадақтаймын: { meaning: '찬양합니다(내가)', pos: '동사', note: '마дақтау 1인칭 단수 현재' },
+  мадақтаймыз: { meaning: '찬양합니다(우리가)', pos: '동사', note: 'мадақтау 1인칭 복수 현재' },
+  даңқ: { meaning: '영광, 영예', pos: '명사', note: 'Даңқ Саған = 주께 영광' },
+  даңқың: { meaning: '주의 영광', pos: '명사', note: 'даңқ + 2인칭 소유어미' },
+  даңқтаймын: { meaning: '영광 돌립니다, 높여 드립니다', pos: '동사', note: 'даңқтау 1인칭 단수' },
+  сүйіспеншілік: { meaning: '사랑, 자애', pos: '명사', note: '깊고 헌신적인 사랑' },
+  сүйемін: { meaning: '사랑합니다', pos: '동사', note: 'сүю 1인칭 단수 현재' },
+  сүйеді: { meaning: '사랑하십니다', pos: '동사', note: 'сүю 3인칭 현재' },
+  мейірім: { meaning: '자비, 긍휼, 인자하심', pos: '명사', note: '사랑과 긍휼이 풍성하신' },
+  мейірімің: { meaning: '주의 자비하심', pos: '명사', note: 'мейірім + 2인칭 소유어미' },
+  мейірімді: { meaning: '자비로우신, 인자하신', pos: '형용사', note: '성품 형용사' },
+  рақым: { meaning: '은혜, 긍휼, 자비', pos: '명사', note: '값없이 주시는 하나님의 은혜' },
+  рақымың: { meaning: '주의 은혜', pos: '명사', note: 'рақым + 2인칭 소유어미' },
+  қан: { meaning: '피, 보혈', pos: '명사', note: '예수님의 십자가 보혈' },
+  қаны: { meaning: '그분의 피(보혈)', pos: '명사', note: 'қан + 3인칭 소유어미 -ы' },
+  айқыш: { meaning: '십자가', pos: '명사', note: '예수님이 달리신 십자가' },
+  құтқарушы: { meaning: '구원자, 구주', pos: '명사', note: 'құтқару(구원하다)에서 파생' },
+  құтқардың: { meaning: '구원하셨습니다(주님이)', pos: '동사', note: '과거 2인칭 단수' },
+  патша: { meaning: '왕, 임금', pos: '명사', note: 'Патшалардың Патшасы = 만왕의 왕' },
+  патшам: { meaning: '나의 왕', pos: '명사', note: 'патша + -м' },
+  патшалық: { meaning: '왕국, 하나님의 나라', pos: '명사', note: 'Құдай Патшалығы = 하나님 나라' },
+  жүрек: { meaning: '마음, 심장', pos: '명사', note: 'к가 모음 사이에서 г로 변함 (жүрегім)' },
+  жүрегім: { meaning: '내 마음', pos: '명사', note: 'жүрек + 1인칭 소유어미' },
+  жүрегімде: { meaning: '내 마음속에', pos: '명사', note: '처격 어미 -де (~안에)' },
+  жан: { meaning: '영혼, 생명', pos: '명사', note: '사람의 영혼' },
+  жаным: { meaning: '내 영혼아', pos: '명사', note: 'жан + -ым' },
+  өмір: { meaning: '생명, 삶', pos: '명사', note: 'Мәңгілік өмір = 영생' },
+  өмірім: { meaning: '내 삶, 내 생명', pos: '명사', note: 'өмір + -ім' },
+  еркіндік: { meaning: '자유', pos: '명사', note: '그리스도 안에서의 자유' },
+  азаттық: { meaning: '자유, 해방', pos: '명사', note: '죄로부터의 해방' },
+  күш: { meaning: '힘, 권능, 능력', pos: '명사', note: '하나님의 능력' },
+  күшің: { meaning: '주의 능력', pos: '명사', note: 'күш + 2인칭 소유어미' },
+  нұр: { meaning: '빛, 광채', pos: '명사', note: '하늘의 영광스러운 빛' },
+  жарық: { meaning: '빛, 밝음', pos: '명사', note: '어둠을 밝히는 빛' },
+  тыныштық: { meaning: '평안, 평강', pos: '명사', note: '마음의 참 평안' },
+  бейбітшілік: { meaning: '평화, 화평', pos: '명사', note: '샬롬(평화)' },
+  үміт: { meaning: '소망, 희망', pos: '명사', note: '바라보고 의지하는 소망' },
+  сенім: { meaning: '믿음, 신뢰', pos: '명사', note: 'сену(믿다)에서 파생' },
+  сенемін: { meaning: '믿습니다', pos: '동사', note: 'сену 1인칭 단수 현재' },
+  алғыс: { meaning: '감사', pos: '명사', note: 'Алғыс айтамын = 감사합니다' },
+  рахмет: { meaning: '감사합니다, 고맙습니다', pos: '명사', note: '일상·찬양에서의 감사 표현' },
+  табынамын: { meaning: '경배합니다(내가)', pos: '동사', note: 'табыну 1인칭 단수 현재' },
+  табынамыз: { meaning: '경배합니다(우리가)', pos: '동사', note: 'табыну 1인칭 복수 현재' },
+  халлелуя: { meaning: '할렐루야', pos: '감탄사', note: '여호와를 찬양하라' },
+  аумин: { meaning: '아멘', pos: '감탄사', note: '진실로 그러합니다' },
+  аспан: { meaning: '하늘', pos: '명사', note: '하늘과 땅' },
+  көк: { meaning: '하늘, 창공', pos: '명사', note: 'Көктегі Әке = 하늘에 계신 아버지' },
+  жер: { meaning: '땅, 세상', pos: '명사', note: '온 땅' },
+  мәңгі: { meaning: '영원히, 영원한', pos: '부사', note: '끝없이 영원토록' },
+  мәңгілік: { meaning: '영원함, 영원한', pos: '명사/형용사', note: '영원하신 하나님' },
+  құдіретті: { meaning: '전능하신', pos: '형용사', note: '능력과 권세가 크신' },
+  ұлы: { meaning: '위대하신, 크신', pos: '형용사', note: '예: Ұлы Құдай (위대하신 하나님)' },
+  жаратушы: { meaning: '창조주', pos: '명사', note: 'жарату(창조하다)에서 파생' },
+  сен: { meaning: '주님, 당신', pos: '대명사', note: '2인칭 단수 (찬양에서는 하나님을 지칭)' },
+  сені: { meaning: '주님을, 당신을', pos: '대명사', note: 'сен의 목적격' },
+  саған: { meaning: '주님께, 당신에게', pos: '대명사', note: 'сен의 여격' },
+  сенің: { meaning: '주님의, 당신의', pos: '대명사', note: 'сен의 속격' },
+  мен: { meaning: '나 / ~와 함께', pos: '대명사/조사', note: '주어 나 또는 조격 접속사' },
+  менің: { meaning: '나의', pos: '대명사', note: 'мен의 속격' },
+  мені: { meaning: '나를', pos: '대명사', note: 'мен의 목적격' },
+  маған: { meaning: '나에게', pos: '대명사', note: 'мен의 여격' },
+  біз: { meaning: '우리', pos: '대명사', note: '1인칭 복수' },
+  біздің: { meaning: '우리의', pos: '대명사', note: 'біз의 속격' },
+  барлық: { meaning: '모든, 전부', pos: '한정사', note: '모두, 온' },
+  бүкіл: { meaning: '온, 전체의', pos: '한정사', note: 'бүкіл әлем = 온 세상' },
+  ән: { meaning: '노래, 찬송', pos: '명사', note: '찬양의 노래' },
+  әнім: { meaning: '나의 노래', pos: '명사', note: 'ән + -ім' },
+  есім: { meaning: '이름', pos: '명사', note: '존귀한 이름' },
+  есімің: { meaning: '주의 이름', pos: '명사', note: 'есім + 2인칭 소유어미' },
+  қайнар: { meaning: '샘, 근원', pos: '명사', note: 'Бақыт қайнар = 복된 샘' },
+  су: { meaning: '물', pos: '명사', note: 'Тірі су = 생수' },
+  тірі: { meaning: '살아 계신', pos: '형용사', note: 'Тірі Құдай = 살아 계신 하나님' },
+  бақыт: { meaning: '복, 행복', pos: '명사', note: '하늘의 참된 복' },
+};
+
 export function normalizeRussianWord(raw: string): string {
-  return raw
-    .replace(/^[^А-Яа-яЁё]+|[^А-Яа-яЁё]+$/g, '')
-    .toLowerCase();
+  return raw.replace(TRIM_NON_CYRILLIC_RE, '').toLowerCase();
 }
 
 interface WordCacheStore {
@@ -464,16 +578,21 @@ function writeWordCache(store: WordCacheStore): void {
   }
 }
 
-export async function lookupRussianWord(rawWord: string): Promise<RussianWordInfo> {
-  const cleanWord = rawWord.replace(/^[^А-Яа-яЁё]+|[^А-Яа-яЁё]+$/g, '') || rawWord.trim();
+export async function lookupRussianWord(
+  rawWord: string,
+  sourceLang: StudyWordLang = 'ru'
+): Promise<RussianWordInfo> {
+  const cleanWord = rawWord.replace(TRIM_NON_CYRILLIC_RE, '') || rawWord.trim();
   const normalized = normalizeRussianWord(cleanWord);
   const readingKo = transliterateRussianToKorean(cleanWord);
+  const glossary = sourceLang === 'kk' ? WORSHIP_KK_DICT : WORSHIP_RU_DICT;
 
-  if (normalized && WORSHIP_RU_DICT[normalized]) {
-    const entry = WORSHIP_RU_DICT[normalized];
+  if (normalized && glossary[normalized]) {
+    const entry = glossary[normalized];
     return {
       word: cleanWord,
       normalized,
+      sourceLang,
       readingKo,
       meaning: entry.meaning,
       pos: entry.pos,
@@ -481,11 +600,21 @@ export async function lookupRussianWord(rawWord: string): Promise<RussianWordInf
     };
   }
 
+  const cacheKey = `${sourceLang}:${normalized}`;
   const cache = readWordCache();
-  if (normalized && cache.entries[normalized]) {
+  if (normalized && cache.entries[cacheKey]) {
+    return {
+      ...cache.entries[cacheKey],
+      word: cleanWord,
+      sourceLang,
+      readingKo,
+    };
+  }
+  if (sourceLang === 'ru' && normalized && cache.entries[normalized]) {
     return {
       ...cache.entries[normalized],
       word: cleanWord,
+      sourceLang: 'ru',
       readingKo,
     };
   }
@@ -493,7 +622,7 @@ export async function lookupRussianWord(rawWord: string): Promise<RussianWordInf
   const res = await fetch('/api/translate-lyrics', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ mode: 'word', word: cleanWord, source: 'ru', target: 'ko' }),
+    body: JSON.stringify({ mode: 'word', word: cleanWord, source: sourceLang, target: 'ko' }),
   });
 
   if (!res.ok) {
@@ -509,6 +638,7 @@ export async function lookupRussianWord(rawWord: string): Promise<RussianWordInf
   const info: RussianWordInfo = {
     word: cleanWord,
     normalized: normalized || cleanWord.toLowerCase(),
+    sourceLang,
     readingKo,
     romanization: data.romanization || undefined,
     meaning: data.meaning?.trim() || '뜻을 찾지 못했습니다',
@@ -518,8 +648,8 @@ export async function lookupRussianWord(rawWord: string): Promise<RussianWordInf
 
   if (normalized && data.meaning?.trim()) {
     const store = readWordCache();
-    store.order = [normalized, ...store.order.filter((k) => k !== normalized)];
-    store.entries[normalized] = info;
+    store.order = [cacheKey, ...store.order.filter((k) => k !== cacheKey)];
+    store.entries[cacheKey] = info;
     while (store.order.length > MAX_CACHED_WORDS) {
       const evicted = store.order.pop();
       if (evicted) delete store.entries[evicted];
@@ -550,26 +680,36 @@ function saveRussianVocab(list: RussianWordInfo[]): void {
 
 export function toggleSavedRussianWord(info: RussianWordInfo): RussianWordInfo[] {
   const current = getSavedRussianVocab();
-  const exists = current.some((w) => w.normalized === info.normalized);
+  const targetLang = info.sourceLang ?? 'ru';
+  const exists = current.some(
+    (w) => w.normalized === info.normalized && (w.sourceLang ?? 'ru') === targetLang
+  );
   const next = exists
-    ? current.filter((w) => w.normalized !== info.normalized)
-    : [info, ...current];
+    ? current.filter(
+        (w) => !(w.normalized === info.normalized && (w.sourceLang ?? 'ru') === targetLang)
+      )
+    : [{ ...info, sourceLang: targetLang }, ...current];
   saveRussianVocab(next);
   return next;
 }
 
-export function removeSavedRussianWord(normalized: string): RussianWordInfo[] {
-  const next = getSavedRussianVocab().filter((w) => w.normalized !== normalized);
+export function removeSavedRussianWord(
+  normalized: string,
+  sourceLang: StudyWordLang = 'ru'
+): RussianWordInfo[] {
+  const next = getSavedRussianVocab().filter(
+    (w) => !(w.normalized === normalized && (w.sourceLang ?? 'ru') === sourceLang)
+  );
   saveRussianVocab(next);
   return next;
 }
 
-export function speakRussianWord(word: string): void {
+export function speakRussianWord(word: string, sourceLang: StudyWordLang = 'ru'): void {
   if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
   try {
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(word);
-    utterance.lang = 'ru-RU';
+    utterance.lang = sourceLang === 'kk' ? 'kk-KZ' : 'ru-RU';
     utterance.rate = 0.85;
     window.speechSynthesis.speak(utterance);
   } catch {
@@ -588,7 +728,7 @@ export function tokenizeTextWithWordMap(
 ): Array<{ chord?: string; pieces: WordTextPiece[] }> {
   const fullText = segments.map((s) => s.text).join('');
   const spans: Array<{ start: number; end: number; fullWord: string; normalized: string }> = [];
-  const regex = /[А-Яа-яЁё]+/g;
+  const regex = new RegExp(CYRILLIC_WORD_RE.source, 'g');
   let match: RegExpExecArray | null;
   while ((match = regex.exec(fullText)) !== null) {
     const fullWord = match[0];
