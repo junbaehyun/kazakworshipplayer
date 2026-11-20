@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { BookOpen, Check, ChevronRight, CloudUpload, Code2, Download, HardDrive, LogOut, Mail, Music2, RotateCcw, ShieldCheck, Smartphone, Trash2, Trophy } from 'lucide-react';
+import { BookOpen, Check, ChevronRight, CloudUpload, Code2, Download, HardDrive, LogOut, Mail, Music2, Play, RefreshCw, RotateCcw, ShieldCheck, Smartphone, Trash2, Trophy } from 'lucide-react';
 import type { Session } from '@supabase/supabase-js';
 import type { TranslationStrings } from '../i18n/translations';
 import {
@@ -8,6 +8,7 @@ import {
   adminFetchReports,
   adminResolveReport,
   signInAdmin,
+  signInWithGoogle,
   signOutAdmin,
 } from '../lib/supabase';
 import { getWeeklyChartInfo } from '../lib/localDb';
@@ -35,6 +36,7 @@ interface SettingsAdminViewProps {
   onResetWeeklyChart: () => void;
   likedCount: number;
   onResetLikedSongs: () => void;
+  onPreviewSong?: (song: Song) => void;
 }
 
 export function SettingsAdminView({
@@ -59,6 +61,7 @@ export function SettingsAdminView({
   onResetWeeklyChart,
   likedCount,
   onResetLikedSongs,
+  onPreviewSong,
 }: SettingsAdminViewProps) {
   const [email, setEmail] = useState('junbaehyun.kz@gmail.com');
   const [password, setPassword] = useState('');
@@ -67,6 +70,8 @@ export function SettingsAdminView({
   const [reports, setReports] = useState<SongReport[]>([]);
   const [dombraTapCount, setDombraTapCount] = useState(0);
   const [confirmResetLiked, setConfirmResetLiked] = useState(false);
+  const [adminActionError, setAdminActionError] = useState<string | null>(null);
+  const [isRefreshingAdmin, setIsRefreshingAdmin] = useState(false);
   const [devSettingsOpen, setDevSettingsOpen] = useState(
     () => sessionStorage.getItem('kwp_dev_mode') === 'true'
   );
@@ -114,6 +119,13 @@ export function SettingsAdminView({
   };
 
   const pendingSongs = songs.filter((s) => s.status === 'pending');
+  const publishedUploadedSongs = songs.filter(
+    (s) =>
+      s.status === 'published' &&
+      (s.uploaded_by !== 'developer' ||
+        /^[0-9a-f-]{36}$/i.test(s.id) ||
+        s.id.startsWith('local-'))
+  );
   const sizeMb = (offlineBytes / (1024 * 1024)).toFixed(1);
   const { nextResetAt } = getWeeklyChartInfo();
   const nextResetLabel = new Date(nextResetAt).toLocaleDateString();
@@ -151,6 +163,23 @@ export function SettingsAdminView({
             <div className="min-w-0">
               <p className="text-xs font-bold text-[#1D1D1F]">{t.tabOffline}</p>
               <p className="text-[11px] text-[#86868B]">{offlineCount} MP3 · {sizeMb} MB</p>
+            </div>
+          </div>
+          <ChevronRight className="w-4 h-4 text-[#86868B] shrink-0" />
+        </button>
+
+        <button
+          type="button"
+          onClick={() => onNavigateTab('upload')}
+          className="w-full px-4 py-3 flex items-center justify-between text-left active:bg-black/5 transition"
+        >
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="w-8 h-8 rounded-xl bg-[#007AFF]/12 text-[#007AFF] flex items-center justify-center shrink-0">
+              <CloudUpload className="w-4 h-4" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-xs font-bold text-[#1D1D1F]">{t.tabUpload}</p>
+              <p className="text-[11px] text-[#86868B] truncate">{t.uploadSubtitle}</p>
             </div>
           </div>
           <ChevronRight className="w-4 h-4 text-[#86868B] shrink-0" />
@@ -226,24 +255,6 @@ export function SettingsAdminView({
             />
           </button>
         </div>
-
-        {devSettingsOpen && (
-          <button
-            type="button"
-            onClick={() => onNavigateTab('upload')}
-            className="w-full px-4 py-3 flex items-center justify-between text-left active:bg-black/5 transition"
-          >
-            <div className="flex items-center gap-3 min-w-0">
-              <span className="w-8 h-8 rounded-xl bg-[#007AFF]/12 text-[#007AFF] flex items-center justify-center shrink-0">
-                <CloudUpload className="w-4 h-4" />
-              </span>
-              <div className="min-w-0">
-                <p className="text-xs font-bold text-[#1D1D1F]">{t.tabUpload}</p>
-              </div>
-            </div>
-            <ChevronRight className="w-4 h-4 text-[#86868B] shrink-0" />
-          </button>
-        )}
       </div>
 
       {/* Weekly Chart Reset Control */}
@@ -390,119 +401,246 @@ export function SettingsAdminView({
         )}
       </div>
 
-      {/* Admin Login / Admin Panel (Shown only when Dev Mode is ON) */}
-      {devSettingsOpen && (
-        <div className="bg-[#F5F5F7] rounded-2xl p-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-xs font-extrabold text-[#1D1D1F] flex items-center gap-1.5">
-              <ShieldCheck className="w-4 h-4 text-[#FA243C]" />
-              <span>{isAdmin ? t.adminSectionTitle : session || localUserEmail ? t.authAccountTitle : t.adminSectionTitle}</span>
-            </h3>
-            {(session || localUserEmail) && (
-              <button
-                type="button"
-                onClick={() => void handleLogout()}
-                className="text-xs font-semibold text-[#FA243C] flex items-center gap-1"
-              >
-                <LogOut className="w-3.5 h-3.5" />
-                <span>{t.adminLogoutBtn}</span>
-              </button>
-            )}
-          </div>
+      {/* Account & Admin Approval Panel */}
+      <div className="bg-[#F5F5F7] rounded-2xl p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <h3 className="text-xs font-extrabold text-[#1D1D1F] flex items-center gap-1.5">
+            <ShieldCheck className="w-4 h-4 text-[#FA243C]" />
+            <span>{isAdmin ? t.adminSectionTitle : session || localUserEmail ? t.authAccountTitle : t.adminSectionTitle}</span>
+          </h3>
+          {(session || localUserEmail) && (
+            <button
+              type="button"
+              onClick={() => void handleLogout()}
+              className="text-xs font-semibold text-[#FA243C] flex items-center gap-1"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span>{t.adminLogoutBtn}</span>
+            </button>
+          )}
+        </div>
 
         {!session && !localUserEmail ? (
-          <form onSubmit={handleLogin} className="space-y-2.5">
-            <input
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder={t.adminEmailPlaceholder}
-              className="w-full bg-white rounded-xl px-3.5 py-2.5 text-xs border border-black/[0.06] focus:outline-none"
-            />
-            <input
-              type="password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder={t.adminPasswordPlaceholder}
-              className="w-full bg-white rounded-xl px-3.5 py-2.5 text-xs border border-black/[0.06] focus:outline-none"
-            />
-            {authError && <p className="text-xs text-[#FA243C] font-medium">{authError}</p>}
+          <div className="space-y-2.5">
             <button
-              type="submit"
+              type="button"
               disabled={isLoggingIn}
-              className="w-full py-2.5 rounded-xl bg-[#1D1D1F] text-white text-xs font-bold active:opacity-85 transition"
+              onClick={async () => {
+                setAuthError(null);
+                setIsLoggingIn(true);
+                try {
+                  const { error } = await signInWithGoogle();
+                  if (error) setAuthError(error);
+                } finally {
+                  setIsLoggingIn(false);
+                }
+              }}
+              className="w-full py-2.5 px-3 rounded-xl bg-white text-[#1D1D1F] text-xs font-bold border border-black/[0.08] flex items-center justify-center gap-2 active:opacity-80 transition disabled:opacity-60"
             >
-              {isLoggingIn ? '...' : t.adminLoginBtn}
+              <span>{t.authGoogleBtn}</span>
             </button>
-          </form>
+
+            <form onSubmit={handleLogin} className="space-y-2">
+              <input
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder={t.adminEmailPlaceholder}
+                className="w-full bg-white rounded-xl px-3.5 py-2.5 text-xs border border-black/[0.06] focus:outline-none"
+              />
+              <input
+                type="password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder={t.adminPasswordPlaceholder}
+                className="w-full bg-white rounded-xl px-3.5 py-2.5 text-xs border border-black/[0.06] focus:outline-none"
+              />
+              {authError && <p className="text-xs text-[#FA243C] font-medium">{authError}</p>}
+              <button
+                type="submit"
+                disabled={isLoggingIn}
+                className="w-full py-2.5 rounded-xl bg-[#1D1D1F] text-white text-xs font-bold active:opacity-85 transition"
+              >
+                {isLoggingIn ? '...' : t.adminLoginBtn}
+              </button>
+            </form>
+          </div>
         ) : !isAdmin ? (
-          <p className="text-xs text-[#34C759] font-semibold">
-            ✓ {t.adminLoggedInAs} {session?.user.email ?? localUserEmail}
-          </p>
+          <div className="space-y-2">
+            <p className="text-xs text-[#34C759] font-semibold">
+              ✓ {t.adminLoggedInAs} {session?.user.email ?? localUserEmail}
+            </p>
+            <button
+              type="button"
+              onClick={() => onNavigateTab('upload')}
+              className="w-full py-2 rounded-xl bg-white border border-black/[0.06] text-xs font-bold text-[#1D1D1F] flex items-center justify-center gap-1.5 active:bg-black/5"
+            >
+              <CloudUpload className="w-3.5 h-3.5 text-[#007AFF]" />
+              <span>{t.tabUpload}</span>
+            </button>
+          </div>
         ) : (
           <div className="space-y-4">
-            <p className="text-xs text-[#34C759] font-semibold">
-              ✓ {t.adminLoggedInAs} {session?.user.email}
-            </p>
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs text-[#34C759] font-semibold truncate">
+                ✓ {t.adminLoggedInAs} {session?.user.email}
+              </p>
+              <button
+                type="button"
+                disabled={isRefreshingAdmin}
+                onClick={async () => {
+                  setIsRefreshingAdmin(true);
+                  setAdminActionError(null);
+                  try {
+                    await onRefreshSongs();
+                  } finally {
+                    setIsRefreshingAdmin(false);
+                  }
+                }}
+                aria-label="Refresh pending queue"
+                className="p-1.5 rounded-lg bg-white border border-black/[0.06] text-[#1D1D1F] active:scale-95 shrink-0"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isRefreshingAdmin ? 'animate-spin' : ''}`} />
+              </button>
+            </div>
 
-            {/* Pending Songs (if any) */}
-            {pendingSongs.length > 0 && (
-              <div className="space-y-2">
+            {adminActionError && (
+              <div className="rounded-xl bg-[#FA243C]/10 text-[#FA243C] px-3 py-2 text-[11px] font-semibold">
+                {adminActionError}
+              </div>
+            )}
+
+            {/* Pending Approval Queue */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
                 <h4 className="text-xs font-bold text-[#1D1D1F]">{t.adminPendingTitle}</h4>
-                {pendingSongs.map((s) => (
-                  <div key={s.id} className="bg-white rounded-xl p-3 flex items-center justify-between gap-2">
-                    <span className="text-xs font-semibold truncate">{s.title}</span>
-                    <div className="flex items-center gap-1.5 shrink-0">
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-[#FA243C]/12 text-[#FA243C]">
+                  {pendingSongs.length}
+                </span>
+              </div>
+
+              {pendingSongs.length === 0 ? (
+                <p className="text-[11px] text-[#86868B] bg-white rounded-xl px-3 py-2.5 border border-black/[0.04]">
+                  No pending songs waiting for approval.
+                </p>
+              ) : (
+                pendingSongs.map((s) => (
+                  <div key={s.id} className="bg-white rounded-xl p-3 space-y-2 border border-black/[0.05]">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-xs font-bold text-[#1D1D1F] truncate">{s.title}</span>
+                          {s.lang && (
+                            <span className="px-1.5 py-0.5 rounded bg-[#F5F5F7] text-[9px] font-extrabold uppercase text-[#515154]">
+                              {s.lang}
+                            </span>
+                          )}
+                          {s.song_key && (
+                            <span className="px-1.5 py-0.5 rounded bg-[#F5F5F7] text-[9px] font-bold text-[#1D1D1F]">
+                              {s.song_key}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-[#86868B] truncate">
+                          {s.is_unknown_author ? t.unknownAuthor : s.artist} ·{' '}
+                          {s.audio_url ? 'Audio' : 'Lyrics only'} · {s.uploaded_by}
+                        </p>
+                      </div>
+                    </div>
+
+                    {s.lyrics && (
+                      <p className="text-[11px] text-[#515154] line-clamp-2 bg-[#F5F5F7] rounded-lg px-2.5 py-1.5">
+                        {s.lyrics}
+                      </p>
+                    )}
+
+                    <div className="flex items-center gap-1.5">
+                      {s.audio_url && onPreviewSong && (
+                        <button
+                          type="button"
+                          onClick={() => onPreviewSong(s)}
+                          className="px-2.5 py-1.5 rounded-lg bg-[#F5F5F7] text-[#1D1D1F] text-[11px] font-bold flex items-center gap-1 active:scale-95"
+                        >
+                          <Play className="w-3 h-3 fill-[#1D1D1F]" />
+                          <span>Preview</span>
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={async () => {
-                          await adminApproveSong(s.id);
-                          await onRefreshSongs();
+                          setAdminActionError(null);
+                          try {
+                            await adminApproveSong(s.id);
+                            await onRefreshSongs();
+                          } catch (err) {
+                            setAdminActionError(
+                              err instanceof Error ? err.message : 'Approve failed'
+                            );
+                          }
                         }}
-                        className="px-2.5 py-1 rounded-lg bg-[#34C759] text-white text-xs font-bold"
+                        className="flex-1 py-1.5 rounded-lg bg-[#34C759] text-white text-[11px] font-bold active:opacity-85"
                       >
-                        {t.adminApproveBtn}
+                        ✓ {t.adminApproveBtn}
                       </button>
                       <button
                         type="button"
                         onClick={async () => {
-                          await adminDeleteSong(s.id);
-                          await onRefreshSongs();
+                          setAdminActionError(null);
+                          try {
+                            await adminDeleteSong(s.id, s.storage_path);
+                            await onRefreshSongs();
+                          } catch (err) {
+                            setAdminActionError(
+                              err instanceof Error ? err.message : 'Delete failed'
+                            );
+                          }
                         }}
-                        className="p-1.5 rounded-lg bg-[#FA243C]/10 text-[#FA243C]"
+                        aria-label={t.adminDeleteBtn}
+                        className="px-2.5 py-1.5 rounded-lg bg-[#FA243C]/10 text-[#FA243C] active:scale-95"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
                   </div>
-                ))}
+                ))
+              )}
+            </div>
+
+            {/* Community / Cloud Published Songs Quick Delete */}
+            {publishedUploadedSongs.length > 0 && (
+              <div className="space-y-1.5">
+                <h4 className="text-xs font-bold text-[#1D1D1F]">
+                  Community / Cloud ({publishedUploadedSongs.length})
+                </h4>
+                <div className="max-h-40 overflow-y-auto space-y-1.5">
+                  {publishedUploadedSongs.map((s) => (
+                    <div key={s.id} className="bg-white rounded-xl px-3 py-2 flex items-center justify-between gap-2">
+                      <span className="text-xs font-medium truncate">{s.title}</span>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          setAdminActionError(null);
+                          try {
+                            await adminDeleteSong(s.id, s.storage_path);
+                            await onRefreshSongs();
+                          } catch (err) {
+                            setAdminActionError(
+                              err instanceof Error ? err.message : 'Delete failed'
+                            );
+                          }
+                        }}
+                        className="text-xs text-[#FA243C] font-semibold flex items-center gap-1 shrink-0"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>{t.adminDeleteBtn}</span>
+                      </button>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
-
-            {/* All Published Songs Quick Delete */}
-            <div className="space-y-1.5">
-              <h4 className="text-xs font-bold text-[#1D1D1F]">{t.allSongsTitle} ({songs.length})</h4>
-              <div className="max-h-40 overflow-y-auto space-y-1.5">
-                {songs.map((s) => (
-                  <div key={s.id} className="bg-white rounded-xl px-3 py-2 flex items-center justify-between gap-2">
-                    <span className="text-xs font-medium truncate">{s.title}</span>
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        await adminDeleteSong(s.id);
-                        await onRefreshSongs();
-                      }}
-                      className="text-xs text-[#FA243C] font-semibold flex items-center gap-1 shrink-0"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                      <span>{t.adminDeleteBtn}</span>
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
 
             {/* Reports & Messages Inbox */}
             <div className="space-y-2">
@@ -545,8 +683,7 @@ export function SettingsAdminView({
             </div>
           </div>
         )}
-        </div>
-      )}
+      </div>
     </div>
   );
 }

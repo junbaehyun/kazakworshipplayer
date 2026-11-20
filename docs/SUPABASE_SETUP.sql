@@ -12,16 +12,21 @@ CREATE TABLE IF NOT EXISTS public.kwp_songs (
     artist TEXT NOT NULL DEFAULT 'Белгісіз автор (Unknown)',
     is_unknown_author BOOLEAN NOT NULL DEFAULT true,
     permission_note TEXT DEFAULT 'Permitted for community worship sharing',
-    audio_url TEXT NOT NULL,
+    audio_url TEXT NOT NULL DEFAULT '',
     storage_path TEXT,
     duration_seconds INTEGER NOT NULL DEFAULT 0,
     lyrics TEXT,
+    song_key TEXT,
+    lang TEXT NOT NULL DEFAULT 'kk' CHECK (lang IN ('kk', 'ru', 'ko', 'en')),
     play_count BIGINT NOT NULL DEFAULT 0,
     uploaded_by TEXT DEFAULT 'community',
-    status TEXT NOT NULL DEFAULT 'published' CHECK (status IN ('published', 'pending', 'removed')),
-    is_active BOOLEAN NOT NULL DEFAULT true,
+    status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('published', 'pending', 'removed')),
+    is_active BOOLEAN NOT NULL DEFAULT false,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+ALTER TABLE public.kwp_songs ADD COLUMN IF NOT EXISTS song_key TEXT;
+ALTER TABLE public.kwp_songs ADD COLUMN IF NOT EXISTS lang TEXT NOT NULL DEFAULT 'kk';
 
 CREATE INDEX IF NOT EXISTS idx_kwp_songs_play_count ON public.kwp_songs (play_count DESC);
 CREATE INDEX IF NOT EXISTS idx_kwp_songs_created_at ON public.kwp_songs (created_at DESC);
@@ -59,7 +64,13 @@ BEGIN
 END;
 $$;
 
--- 4. Enable Row Level Security (RLS)
+-- 4. Expose kwp_ tables & enable Row Level Security (RLS)
+GRANT SELECT, INSERT ON public.kwp_songs TO anon, authenticated;
+GRANT UPDATE, DELETE ON public.kwp_songs TO authenticated;
+GRANT INSERT ON public.kwp_song_reports TO anon, authenticated;
+GRANT SELECT, UPDATE, DELETE ON public.kwp_song_reports TO authenticated;
+GRANT EXECUTE ON FUNCTION public.kwp_increment_play(UUID) TO anon, authenticated;
+
 ALTER TABLE public.kwp_songs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.kwp_song_reports ENABLE ROW LEVEL SECURITY;
 
@@ -73,12 +84,15 @@ CREATE POLICY "kwp_songs_public_read"
         OR ((select auth.jwt() ->> 'email') IN ('junbaehyun.kz@gmail.com', 'wnsqo35@gmail.com'))
     );
 
--- Community & Admin can insert songs
+-- Community can submit pending songs only; Admin can insert published directly
 DROP POLICY IF EXISTS "kwp_songs_public_insert" ON public.kwp_songs;
 CREATE POLICY "kwp_songs_public_insert"
     ON public.kwp_songs FOR INSERT
     TO anon, authenticated
-    WITH CHECK (true);
+    WITH CHECK (
+        (status = 'pending' AND is_active = false)
+        OR ((select auth.jwt() ->> 'email') IN ('junbaehyun.kz@gmail.com', 'wnsqo35@gmail.com'))
+    );
 
 -- Only Admin can update or delete songs
 DROP POLICY IF EXISTS "kwp_songs_admin_update" ON public.kwp_songs;

@@ -578,6 +578,11 @@ export function App() {
     []
   );
 
+  const pendingCount = useMemo(
+    () => songs.filter((s) => s.status === 'pending').length,
+    [songs]
+  );
+
   const pageTitle =
     tab === 'listen'
       ? t.tabListen
@@ -692,13 +697,18 @@ export function App() {
                 type="button"
                 onClick={() => setIsSettingsOpen((prev) => !prev)}
                 aria-label={t.tabSettings}
-                className={`w-7 h-7 rounded-lg flex items-center justify-center border transition ${
+                className={`relative w-7 h-7 rounded-lg flex items-center justify-center border transition ${
                   isSettingsOpen || tab === 'chart' || tab === 'offline' || tab === 'upload'
                     ? 'bg-[#FA243C] text-white border-[#FA243C]'
                     : 'bg-[#F5F5F7] text-[#1D1D1F] border-black/[0.04]'
                 }`}
               >
                 <Settings className="w-3.5 h-3.5" />
+                {isAdmin && pendingCount > 0 && (
+                  <span className="absolute -top-1 -right-1 min-w-[14px] h-[14px] px-0.5 rounded-full bg-[#FA243C] text-white text-[9px] font-extrabold flex items-center justify-center border border-white">
+                    {pendingCount}
+                  </span>
+                )}
               </button>
             </div>
           </div>
@@ -1208,9 +1218,12 @@ export function App() {
               <Suspense fallback={null}>
                 <UploadView
                   t={t}
+                  lang={lang}
                   isAdmin={isAdmin}
+                  uploaderEmail={session?.user.email ?? localUserEmail}
                   onUploaded={(newSong) => {
                     setSongs((prev) => [newSong, ...prev]);
+                    void refreshSongs();
                     void refreshOfflineStats();
                   }}
                 />
@@ -1455,6 +1468,7 @@ export function App() {
                       onResetWeeklyChart={handleResetWeeklyChart}
                       likedCount={playlistSongs.length}
                       onResetLikedSongs={handleResetLikedSongs}
+                      onPreviewSong={(song) => void player.playSong(song)}
                     />
                   </Suspense>
                 </div>

@@ -46,10 +46,14 @@ export const supabase = isSupabaseConfigured
   : null;
 
 export async function fetchSongs(includePending = false): Promise<{ songs: Song[]; usingLocalFallback: boolean }> {
+  const local = getLocalSongs();
+  const filteredLocal = includePending
+    ? local
+    : local.filter((s) => s.status === 'published' && s.is_active);
+
   if (!supabase) {
-    const local = getLocalSongs();
     return {
-      songs: includePending ? local : local.filter((s) => s.status === 'published' && s.is_active),
+      songs: filteredLocal,
       usingLocalFallback: true,
     };
   }
@@ -66,14 +70,17 @@ export async function fetchSongs(includePending = false): Promise<{ songs: Song[
   const { data, error } = await query;
   if (error) {
     console.warn('Supabase kwp_songs fallback to local:', error.message);
-    const local = getLocalSongs();
     return {
-      songs: includePending ? local : local.filter((s) => s.status === 'published' && s.is_active),
+      songs: filteredLocal,
       usingLocalFallback: true,
     };
   }
 
-  return { songs: (data as Song[]) || [], usingLocalFallback: false };
+  const cloudSongs = (data as Song[]) || [];
+  const cloudIds = new Set(cloudSongs.map((s) => s.id));
+  const uniqueLocal = filteredLocal.filter((s) => !cloudIds.has(s.id));
+
+  return { songs: [...cloudSongs, ...uniqueLocal], usingLocalFallback: false };
 }
 
 export async function uploadSong(params: {
@@ -85,11 +92,20 @@ export async function uploadSong(params: {
   externalUrl?: string;
   durationSeconds: number;
   isAdmin: boolean;
+  lang?: 'kk' | 'ru';
+  songKey?: string;
+  uploaderEmail?: string | null;
 }): Promise<{ song: Song; savedLocally: boolean }> {
   const cleanArtist = params.isUnknownAuthor || !params.artist.trim()
     ? 'Белгісіз автор (Unknown)'
     : params.artist.trim();
   const trimmedUrl = params.externalUrl?.trim() || '';
+  const trimmedLyrics = params.lyrics.trim();
+  const songLang = params.lang ?? 'kk';
+  const cleanKey = params.songKey?.trim() || null;
+  const nextStatus = params.isAdmin ? 'published' : 'pending';
+  const nextActive = params.isAdmin;
+  const uploadedBy = params.isAdmin ? 'developer' : params.uploaderEmail?.trim() || 'community';
 
   if (supabase) {
     try {
@@ -97,26 +113,32 @@ export async function uploadSong(params: {
       let storagePath: string | null = null;
 
       if (!audioUrl && params.file) {
+        let uploadedViaGas = false;
         if (GAS_WEBAPP_URL) {
-          // Upload to Google Drive via GAS Web App (15 GB free, $0)
-          const base64Data = await fileToBase64(params.file);
-          const gasRes = await fetch(GAS_WEBAPP_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-            body: JSON.stringify({
-              fileName: params.file.name,
-              mimeType: params.file.type || 'audio/mpeg',
-              base64Data,
-            }),
-          });
-          const gasJson = (await gasRes.json()) as { ok: boolean; fileId?: string; error?: string };
-          if (!gasJson.ok || !gasJson.fileId) {
-            throw new Error(gasJson.error || 'Google Drive upload failed');
+          try {
+            // Try Google Drive via GAS Web App first ($0)
+            const base64Data = await fileToBase64(params.file);
+            const gasRes = await fetch(GAS_WEBAPP_URL, {
+              method: 'POST',
+              headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+              body: JSON.stringify({
+                fileName: params.file.name,
+                mimeType: params.file.type || 'audio/mpeg',
+                base64Data,
+              }),
+            });
+            const gasJson = (await gasRes.json()) as { ok: boolean; fileId?: string; error?: string };
+            if (gasJson.ok && gasJson.fileId) {
+              audioUrl = `gdrive://${gasJson.fileId}`;
+              storagePath = gasJson.fileId;
+              uploadedViaGas = true;
+            }
+          } catch (gasErr) {
+            console.warn('GAS upload failed, falling back to Supabase Storage:', gasErr);
           }
-          audioUrl = `gdrive://${gasJson.fileId}`;
-          storagePath = gasJson.fileId;
-        } else {
-          // Fallback to Supabase Storage
+        }
+
+        if (!uploadedViaGas) {
           const safeName = params.file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
           storagePath = `${STORAGE_FOLDER}/${Date.now()}-${safeName}`;
 
@@ -131,29 +153,50 @@ export async function uploadSong(params: {
         }
       }
 
-      if (!audioUrl) {
-        throw new Error('Either an audio file or an external URL is required.');
+      if (!audioUrl && !trimmedLyrics) {
+        throw new Error('Either audio or lyrics is required.');
       }
 
-      const { data: inserted, error: insertErr } = await supabase
-        .from('kwp_songs')
-        .insert({
-          title: params.title.trim(),
-          artist: cleanArtist,
-          is_unknown_author: params.isUnknownAuthor || !params.artist.trim(),
-          audio_url: audioUrl,
-          storage_path: storagePath,
-          duration_seconds: Math.round(params.durationSeconds || 0),
-          lyrics: params.lyrics.trim() || null,
-          uploaded_by: params.isAdmin ? 'developer' : 'community',
-          status: 'published',
-          is_active: true,
-        })
-        .select()
-        .single();
+      const songId = crypto.randomUUID();
+      const createdAt = new Date().toISOString();
+      const { error: insertErr } = await supabase.from('kwp_songs').insert({
+        id: songId,
+        title: params.title.trim(),
+        artist: cleanArtist,
+        is_unknown_author: params.isUnknownAuthor || !params.artist.trim(),
+        permission_note: 'Permitted for community worship sharing',
+        audio_url: audioUrl,
+        storage_path: storagePath,
+        duration_seconds: Math.round(params.durationSeconds || 0),
+        lyrics: trimmedLyrics || null,
+        song_key: cleanKey,
+        lang: songLang,
+        uploaded_by: uploadedBy,
+        status: nextStatus,
+        is_active: nextActive,
+        created_at: createdAt,
+      });
 
       if (insertErr) throw insertErr;
-      const insertedSong = inserted as Song;
+
+      const insertedSong: Song = {
+        id: songId,
+        title: params.title.trim(),
+        artist: cleanArtist,
+        is_unknown_author: params.isUnknownAuthor || !params.artist.trim(),
+        permission_note: 'Permitted for community worship sharing',
+        audio_url: audioUrl,
+        storage_path: storagePath,
+        duration_seconds: Math.round(params.durationSeconds || 0),
+        lyrics: trimmedLyrics || null,
+        song_key: cleanKey,
+        lang: songLang,
+        play_count: 0,
+        uploaded_by: uploadedBy,
+        status: nextStatus,
+        is_active: nextActive,
+        created_at: createdAt,
+      };
       if (params.file) {
         await saveOfflineBlob(insertedSong.id, params.file);
       }
@@ -163,7 +206,7 @@ export async function uploadSong(params: {
     }
   }
 
-  // Local IndexedDB fallback
+  // Local IndexedDB / localStorage fallback
   const id = `local-${Date.now()}`;
   if (params.file) {
     await saveOfflineBlob(id, params.file);
@@ -176,11 +219,13 @@ export async function uploadSong(params: {
     permission_note: 'Permitted for community worship sharing',
     audio_url: trimmedUrl,
     duration_seconds: Math.round(params.durationSeconds || 0),
-    lyrics: params.lyrics.trim() || null,
+    lyrics: trimmedLyrics || null,
+    song_key: cleanKey,
+    lang: songLang,
     play_count: 0,
-    uploaded_by: params.isAdmin ? 'developer' : 'community',
-    status: 'published',
-    is_active: true,
+    uploaded_by: uploadedBy,
+    status: nextStatus,
+    is_active: nextActive,
     created_at: new Date().toISOString(),
   };
 
@@ -351,16 +396,26 @@ export async function signOutAdmin(): Promise<void> {
 
 export async function adminApproveSong(songId: string): Promise<void> {
   if (supabase && !songId.startsWith('local-')) {
-    await supabase.from('kwp_songs').update({ status: 'published', is_active: true }).eq('id', songId);
+    const { error } = await supabase
+      .from('kwp_songs')
+      .update({ status: 'published', is_active: true })
+      .eq('id', songId);
+    if (error) throw error;
     return;
   }
-  const local = getLocalSongs().map((s) => (s.id === songId ? { ...s, status: 'published' as const, is_active: true } : s));
+  const local = getLocalSongs().map((s) =>
+    s.id === songId ? { ...s, status: 'published' as const, is_active: true } : s
+  );
   saveLocalSongs(local);
 }
 
-export async function adminDeleteSong(songId: string): Promise<void> {
+export async function adminDeleteSong(songId: string, storagePath?: string | null): Promise<void> {
   if (supabase && !songId.startsWith('local-') && !songId.startsWith('demo-')) {
-    await supabase.from('kwp_songs').delete().eq('id', songId);
+    const { error } = await supabase.from('kwp_songs').delete().eq('id', songId);
+    if (error) throw error;
+    if (storagePath && storagePath.startsWith(`${STORAGE_FOLDER}/`)) {
+      await supabase.storage.from(STORAGE_BUCKET).remove([storagePath]);
+    }
     return;
   }
   const local = getLocalSongs().filter((s) => s.id !== songId);
