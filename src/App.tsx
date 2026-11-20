@@ -1253,6 +1253,8 @@ export function App() {
         {/* Floating Frosted Mini-Player */}
         <MiniPlayer
           song={player.currentSong}
+          prevSong={prevQueueSong}
+          nextSong={nextQueueSong}
           isPlaying={player.isPlaying}
           isOffline={player.currentSong ? offlineIds.includes(player.currentSong.id) : false}
           isShuffle={player.isShuffle}

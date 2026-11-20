@@ -4,7 +4,6 @@ import {
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
-  type TouchEvent as ReactTouchEvent,
 } from 'react';
 import {
   BookOpen,
@@ -61,6 +60,8 @@ interface FullPlayerSheetProps {
   onOpenLyricsMode?: (song: Song) => void;
 }
 
+const CARD_SPACING = 284;
+
 function formatTime(sec: number): string {
   if (!Number.isFinite(sec) || sec < 0) return '00:00';
   const m = Math.floor(sec / 60);
@@ -104,6 +105,7 @@ export function FullPlayerSheet({
   // Horizontal artwork swipe & vertical sheet-dismiss drag states
   const [dragX, setDragX] = useState(0);
   const [isDraggingArtwork, setIsDraggingArtwork] = useState(false);
+  const [skipArtworkTransition, setSkipArtworkTransition] = useState(false);
   const [sheetDragY, setSheetDragY] = useState(0);
   const [isDraggingSheet, setIsDraggingSheet] = useState(false);
 
@@ -115,6 +117,7 @@ export function FullPlayerSheet({
   const swipeTimeoutRef = useRef<number | null>(null);
   const suppressTapRef = useRef(false);
   const gestureRef = useRef<{
+    pointerId: number;
     x: number;
     y: number;
     t: number;
@@ -144,16 +147,22 @@ export function FullPlayerSheet({
     };
   }, []);
 
-  const handleTouchStart = (source: 'artwork' | 'header', e: ReactTouchEvent) => {
-    const touch = e.touches[0];
-    if (!touch) return;
+  const handlePointerDown = (
+    source: 'artwork' | 'header',
+    e: ReactPointerEvent<HTMLDivElement>
+  ) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    if (source === 'header' && (e.target as HTMLElement | null)?.closest('button')) {
+      return;
+    }
     if (swipeTimeoutRef.current !== null) {
       window.clearTimeout(swipeTimeoutRef.current);
       swipeTimeoutRef.current = null;
     }
     gestureRef.current = {
-      x: touch.clientX,
-      y: touch.clientY,
+      pointerId: e.pointerId,
+      x: e.clientX,
+      y: e.clientY,
       t: Date.now(),
       axis: 'none',
       moved: false,
@@ -161,13 +170,12 @@ export function FullPlayerSheet({
     };
   };
 
-  const handleTouchMove = (e: ReactTouchEvent) => {
+  const handlePointerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
     const g = gestureRef.current;
-    const touch = e.touches[0];
-    if (!g || !touch) return;
+    if (!g || g.pointerId !== e.pointerId) return;
 
-    const dx = touch.clientX - g.x;
-    const dy = touch.clientY - g.y;
+    const dx = e.clientX - g.x;
+    const dy = e.clientY - g.y;
     const absDx = Math.abs(dx);
     const absDy = Math.abs(dy);
 
@@ -180,9 +188,19 @@ export function FullPlayerSheet({
       if (g.source === 'artwork' && absDx > absDy * 1.35) {
         g.axis = 'x';
         setIsDraggingArtwork(true);
+        try {
+          e.currentTarget.setPointerCapture(g.pointerId);
+        } catch {
+          // Ignore pointer capture errors
+        }
       } else if (dy > 0 && absDy > absDx * 1.35) {
         g.axis = 'y';
         setIsDraggingSheet(true);
+        try {
+          e.currentTarget.setPointerCapture(g.pointerId);
+        } catch {
+          // Ignore pointer capture errors
+        }
       } else {
         return;
       }
@@ -194,18 +212,28 @@ export function FullPlayerSheet({
       const dampened =
         (dx > 0 && !canMoveRight) || (dx < 0 && !canMoveLeft)
           ? dx * 0.25
-          : Math.max(-280, Math.min(280, dx));
+          : Math.max(-CARD_SPACING, Math.min(CARD_SPACING, dx));
       setDragX(dampened);
     } else if (g.axis === 'y') {
       setSheetDragY(Math.max(0, dy));
     }
   };
 
-  const handleTouchEnd = (e: ReactTouchEvent) => {
+  const handlePointerEnd = (
+    e: ReactPointerEvent<HTMLDivElement>,
+    cancelled = false
+  ) => {
     const g = gestureRef.current;
+    if (!g || g.pointerId !== e.pointerId) return;
     gestureRef.current = null;
-    const touch = e.changedTouches[0];
-    if (!g) return;
+
+    try {
+      if (e.currentTarget.hasPointerCapture(g.pointerId)) {
+        e.currentTarget.releasePointerCapture(g.pointerId);
+      }
+    } catch {
+      // Ignore release errors
+    }
 
     if (g.moved) {
       suppressTapRef.current = true;
@@ -214,27 +242,33 @@ export function FullPlayerSheet({
       }, 240);
     }
 
-    const dx = touch ? touch.clientX - g.x : 0;
-    const dy = touch ? touch.clientY - g.y : 0;
+    const dx = cancelled ? 0 : e.clientX - g.x;
+    const dy = cancelled ? 0 : e.clientY - g.y;
     const dt = Math.max(Date.now() - g.t, 1);
 
     if (g.axis === 'x') {
       setIsDraggingArtwork(false);
       const velocity = Math.abs(dx) / dt;
-      const shouldCommit = Math.abs(dx) > 72 || (Math.abs(dx) > 24 && velocity > 0.45);
+      const shouldCommit =
+        !cancelled &&
+        (Math.abs(dx) > 72 || (Math.abs(dx) > 24 && velocity > 0.45));
       const dir = dx < 0 ? -1 : 1;
       const allowed = dir < 0 ? nextSong !== null : prevSong !== null;
 
       if (shouldCommit && allowed) {
-        setDragX(dir * 320);
+        setDragX(dir * CARD_SPACING);
         if (typeof navigator.vibrate === 'function') {
           navigator.vibrate(10);
         }
         swipeTimeoutRef.current = window.setTimeout(() => {
           swipeTimeoutRef.current = null;
+          setSkipArtworkTransition(true);
+          setDragX(0);
           if (dir < 0) onNext();
           else (onSwipePrev ?? onPrev)();
-          setDragX(0);
+          window.requestAnimationFrame(() => {
+            window.requestAnimationFrame(() => setSkipArtworkTransition(false));
+          });
         }, 160);
       } else {
         setDragX(0);
@@ -245,7 +279,7 @@ export function FullPlayerSheet({
     if (g.axis === 'y') {
       setIsDraggingSheet(false);
       const velocityY = dy / dt;
-      if (dy > 110 || (dy > 40 && velocityY > 0.55)) {
+      if (!cancelled && (sheetDragY > 110 || (dy > 40 && velocityY > 0.55))) {
         setSheetDragY(0);
         onClose();
       } else {
@@ -273,8 +307,13 @@ export function FullPlayerSheet({
 
   const handleScrubPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     e.stopPropagation();
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
     if (effectiveDuration <= 0) return;
-    e.currentTarget.setPointerCapture(e.pointerId);
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {
+      // Ignore capture failure
+    }
     const sec = computeSeekTime(e.clientX);
     setIsScrubbing(true);
     setScrubTime(sec);
@@ -287,6 +326,13 @@ export function FullPlayerSheet({
 
   const finishScrub = (e: ReactPointerEvent<HTMLDivElement>, commit: boolean) => {
     if (!isScrubbing) return;
+    try {
+      if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      }
+    } catch {
+      // Ignore release failure
+    }
     const finalSec = computeSeekTime(e.clientX);
     setIsScrubbing(false);
     if (commit && effectiveDuration > 0) {
@@ -307,26 +353,32 @@ export function FullPlayerSheet({
 
   const author = song.is_unknown_author ? t.unknownAuthor : song.artist;
   const gradient = getSongGradient(song.id);
-  const dragProgress = Math.min(1, Math.abs(dragX) / 240);
+  const dragProgress = Math.min(1, Math.abs(dragX) / CARD_SPACING);
+  const artworkTransition =
+    isDraggingArtwork || skipArtworkTransition
+      ? 'none'
+      : 'transform 200ms cubic-bezier(0.22, 1, 0.36, 1), opacity 200ms ease';
 
   return (
     <div
       className={`${
         isDraggingSheet ? '' : 'am-spring'
       } fixed inset-y-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] z-40 bg-gradient-to-b from-[#FFF5F6] via-white to-[#F5F5F7] flex flex-col justify-between px-6 pt-4 pb-8 ${
+        sheetDragY > 0 ? 'rounded-t-3xl shadow-2xl' : ''
+      } ${
         isOpen ? 'translate-y-0 pointer-events-auto' : 'translate-y-full pointer-events-none'
       }`}
       style={{
         transform: sheetDragY > 0 ? `translateY(${sheetDragY}px)` : undefined,
       }}
     >
-      {/* Top Grabber Bar (Supports Drag-Down to Close) */}
+      {/* Top Grabber Bar (Supports Drag-Down to Close on Mobile & Desktop) */}
       <div
-        onTouchStart={(e) => handleTouchStart('header', e)}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
-        onTouchCancel={handleTouchEnd}
-        className="flex items-center justify-between touch-none"
+        onPointerDown={(e) => handlePointerDown('header', e)}
+        onPointerMove={handlePointerMove}
+        onPointerUp={(e) => handlePointerEnd(e, false)}
+        onPointerCancel={(e) => handlePointerEnd(e, true)}
+        className="flex items-center justify-between touch-none select-none cursor-grab active:cursor-grabbing"
       >
         <button
           type="button"
@@ -346,14 +398,14 @@ export function FullPlayerSheet({
         </button>
       </div>
 
-      {/* Center Artwork Carousel (Swipe L/R to Skip, Down to Close, Tap to Open Lyrics) */}
+      {/* Full-Bleed Artwork Carousel (Swipe L/R to Skip, Down to Close, Tap to Open Lyrics) */}
       {!showLyrics ? (
         <div
-          onTouchStart={(e) => handleTouchStart('artwork', e)}
-          onTouchMove={handleTouchMove}
-          onTouchEnd={handleTouchEnd}
-          onTouchCancel={handleTouchEnd}
-          className="my-auto relative w-full overflow-hidden py-3 flex items-center justify-center touch-pan-y select-none"
+          onPointerDown={(e) => handlePointerDown('artwork', e)}
+          onPointerMove={handlePointerMove}
+          onPointerUp={(e) => handlePointerEnd(e, false)}
+          onPointerCancel={(e) => handlePointerEnd(e, true)}
+          className="my-auto relative -mx-6 w-[calc(100%+48px)] overflow-hidden py-4 flex items-center justify-center touch-none select-none cursor-grab active:cursor-grabbing"
         >
           {/* Peeking Previous Song Card */}
           {prevSong && dragX > 4 && (
@@ -361,11 +413,9 @@ export function FullPlayerSheet({
               aria-hidden="true"
               className="absolute inset-0 flex items-center justify-center pointer-events-none"
               style={{
-                transform: `translateX(${-284 + dragX}px) scale(${0.86 + dragProgress * 0.1})`,
-                opacity: Math.min(0.95, 0.25 + dragX / 180),
-                transition: isDraggingArtwork
-                  ? 'none'
-                  : 'transform 220ms cubic-bezier(0.22, 1, 0.36, 1), opacity 220ms ease',
+                transform: `translateX(${-CARD_SPACING + dragX}px) scale(${0.88 + dragProgress * 0.12})`,
+                opacity: Math.min(1, 0.35 + dragProgress * 0.65),
+                transition: artworkTransition,
               }}
             >
               <div
@@ -382,19 +432,20 @@ export function FullPlayerSheet({
 
           {/* Active Artwork Card */}
           <div
+            key={song.id}
             style={{
               transform:
                 dragX !== 0
-                  ? `translateX(${dragX}px) scale(${Math.max(0.92, 1 - Math.abs(dragX) / 1400)})`
+                  ? `translateX(${dragX}px) scale(${Math.max(0.92, 1 - dragProgress * 0.08)})`
                   : undefined,
-              opacity: Math.max(0.45, 1 - Math.abs(dragX) / 420),
-              transition: isDraggingArtwork
-                ? 'none'
-                : 'transform 220ms cubic-bezier(0.22, 1, 0.36, 1), opacity 220ms ease',
+              opacity: Math.max(0.45, 1 - dragProgress * 0.55),
+              transition: artworkTransition,
             }}
           >
             <button
               type="button"
+              draggable={false}
+              onDragStart={(e) => e.preventDefault()}
               onClick={() => {
                 if (suppressTapRef.current) return;
                 if (onOpenLyricsMode) onOpenLyricsMode(song);
@@ -420,11 +471,9 @@ export function FullPlayerSheet({
               aria-hidden="true"
               className="absolute inset-0 flex items-center justify-center pointer-events-none"
               style={{
-                transform: `translateX(${284 + dragX}px) scale(${0.86 + dragProgress * 0.1})`,
-                opacity: Math.min(0.95, 0.25 + -dragX / 180),
-                transition: isDraggingArtwork
-                  ? 'none'
-                  : 'transform 220ms cubic-bezier(0.22, 1, 0.36, 1), opacity 220ms ease',
+                transform: `translateX(${CARD_SPACING + dragX}px) scale(${0.88 + dragProgress * 0.12})`,
+                opacity: Math.min(1, 0.35 + dragProgress * 0.65),
+                transition: artworkTransition,
               }}
             >
               <div
@@ -483,7 +532,11 @@ export function FullPlayerSheet({
                     : 'bg-[#F5F5F7] border-black/[0.06] text-[#86868B]'
                 }`}
               >
-                <Heart className={`w-4 h-4 ${isLiked ? 'fill-[#FA243C] text-[#FA243C]' : ''}`} />
+                <Heart
+                  className={`w-4 h-4 transition-transform duration-150 ${
+                    isLiked ? 'fill-[#FA243C] text-[#FA243C] scale-110' : 'scale-100'
+                  }`}
+                />
               </button>
             )}
             <button
@@ -540,11 +593,11 @@ export function FullPlayerSheet({
             onPointerUp={(e) => finishScrub(e, true)}
             onPointerCancel={(e) => finishScrub(e, false)}
             onKeyDown={handleScrubKeyDown}
-            className="py-2 -my-2 cursor-pointer touch-none select-none flex items-center"
+            className="group py-2 -my-2 cursor-pointer touch-none select-none flex items-center"
           >
             <div
               className={`relative w-full rounded-full bg-black/[0.09] overflow-visible transition-[height] duration-150 ${
-                isScrubbing ? 'h-2.5' : 'h-1.5'
+                isScrubbing ? 'h-2.5' : 'h-1.5 group-hover:h-2'
               }`}
             >
               <div

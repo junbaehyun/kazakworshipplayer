@@ -1,4 +1,4 @@
-import { useRef, useState, type TouchEvent as ReactTouchEvent } from 'react';
+import { useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { Music2, Pause, Play, Shuffle, SkipForward } from 'lucide-react';
 import type { TranslationStrings } from '../i18n/translations';
 import type { Song } from '../types';
@@ -6,6 +6,8 @@ import { getSongGradient } from './SongRow';
 
 interface MiniPlayerProps {
   song: Song | null;
+  prevSong?: Song | null;
+  nextSong?: Song | null;
   isPlaying: boolean;
   isOffline: boolean;
   isShuffle: boolean;
@@ -25,6 +27,8 @@ interface MiniPlayerProps {
 
 export function MiniPlayer({
   song,
+  prevSong = null,
+  nextSong = null,
   isPlaying,
   isOffline,
   isShuffle,
@@ -42,7 +46,8 @@ export function MiniPlayer({
   onToggleShuffle,
 }: MiniPlayerProps) {
   const [dragX, setDragX] = useState(0);
-  const touchRef = useRef<{
+  const pointerRef = useRef<{
+    pointerId: number;
     x: number;
     y: number;
     t: number;
@@ -92,51 +97,70 @@ export function MiniPlayer({
     );
   }
 
-  const handleTouchStart = (e: ReactTouchEvent) => {
+  const handlePointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
     if ((e.target as HTMLElement | null)?.closest('button')) return;
-    const touch = e.touches[0];
-    if (!touch) return;
-    touchRef.current = {
-      x: touch.clientX,
-      y: touch.clientY,
+    pointerRef.current = {
+      pointerId: e.pointerId,
+      x: e.clientX,
+      y: e.clientY,
       t: Date.now(),
       axis: 'none',
     };
   };
 
-  const handleTouchMove = (e: ReactTouchEvent) => {
-    const start = touchRef.current;
-    const touch = e.touches[0];
-    if (!start || !touch) return;
-    const dx = touch.clientX - start.x;
-    const dy = touch.clientY - start.y;
+  const handlePointerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
+    const start = pointerRef.current;
+    if (!start || start.pointerId !== e.pointerId) return;
+    const dx = e.clientX - start.x;
+    const dy = e.clientY - start.y;
 
     if (start.axis === 'none') {
       if (Math.hypot(dx, dy) < 8) return;
       if (Math.abs(dx) > Math.abs(dy) * 1.4) {
         start.axis = 'x';
+        try {
+          e.currentTarget.setPointerCapture(start.pointerId);
+        } catch {
+          // Ignore capture errors
+        }
       } else if (dy < -12 && Math.abs(dy) > Math.abs(dx) * 1.4) {
         start.axis = 'y';
+        try {
+          e.currentTarget.setPointerCapture(start.pointerId);
+        } catch {
+          // Ignore capture errors
+        }
       } else {
         return;
       }
     }
 
     if (start.axis === 'x') {
-      setDragX(Math.max(-44, Math.min(44, dx * 0.45)));
+      const clamped = Math.max(-140, Math.min(140, dx));
+      setDragX(clamped);
     }
   };
 
-  const handleTouchEnd = (e: ReactTouchEvent) => {
-    const start = touchRef.current;
-    touchRef.current = null;
+  const handlePointerEnd = (
+    e: ReactPointerEvent<HTMLDivElement>,
+    cancelled = false
+  ) => {
+    const start = pointerRef.current;
+    if (!start || start.pointerId !== e.pointerId) return;
+    pointerRef.current = null;
     setDragX(0);
-    if (!start) return;
 
-    const touch = e.changedTouches[0];
-    if (!touch) return;
-    const dx = touch.clientX - start.x;
-    const dy = touch.clientY - start.y;
+    try {
+      if (e.currentTarget.hasPointerCapture(start.pointerId)) {
+        e.currentTarget.releasePointerCapture(start.pointerId);
+      }
+    } catch {
+      // Ignore release errors
+    }
+
+    const dx = cancelled ? 0 : e.clientX - start.x;
+    const dy = cancelled ? 0 : e.clientY - start.y;
     const dt = Math.max(Date.now() - start.t, 1);
     const velocity = Math.abs(dx) / dt;
 
@@ -145,14 +169,14 @@ export function MiniPlayer({
       window.setTimeout(() => {
         suppressClickRef.current = false;
       }, 220);
-      if (Math.abs(dx) > 44 || (Math.abs(dx) > 18 && velocity > 0.45)) {
+      if (!cancelled && (Math.abs(dx) > 44 || (Math.abs(dx) > 18 && velocity > 0.45))) {
         if (typeof navigator.vibrate === 'function') {
           navigator.vibrate(10);
         }
         if (dx < 0) onNext();
         else onPrev?.();
       }
-    } else if (start.axis === 'y' && dy < -36) {
+    } else if (!cancelled && start.axis === 'y' && dy < -36) {
       suppressClickRef.current = true;
       window.setTimeout(() => {
         suppressClickRef.current = false;
@@ -164,6 +188,8 @@ export function MiniPlayer({
   const progress = duration > 0 ? Math.min(100, (currentTime / duration) * 100) : 0;
   const author = song.is_unknown_author ? t.unknownAuthor : song.artist;
   const gradient = getSongGradient(song.id);
+  const trackTransition =
+    dragX === 0 ? 'transform 180ms cubic-bezier(0.22, 1, 0.36, 1)' : 'none';
 
   return (
     <div
@@ -171,37 +197,95 @@ export function MiniPlayer({
         if (suppressClickRef.current) return;
         onExpand();
       }}
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
-      onTouchCancel={handleTouchEnd}
-      className={`fixed ${positionClass} left-1/2 -translate-x-1/2 w-[calc(100%-24px)] max-w-[406px] z-30 rounded-[28px] liquid-glass overflow-hidden px-3 py-2 cursor-pointer active:scale-[0.99] am-spring touch-pan-y select-none`}
+      onDragStart={(e) => e.preventDefault()}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={(e) => handlePointerEnd(e, false)}
+      onPointerCancel={(e) => handlePointerEnd(e, true)}
+      className={`fixed ${positionClass} left-1/2 -translate-x-1/2 w-[calc(100%-24px)] max-w-[406px] z-30 rounded-[28px] liquid-glass overflow-hidden px-3 py-2 cursor-pointer active:scale-[0.99] am-spring touch-none select-none`}
     >
       <div className="flex items-center justify-between gap-2.5">
-        <div
-          className="flex items-center gap-2.5 min-w-0 flex-1"
-          style={{
-            transform: dragX !== 0 ? `translateX(${dragX}px)` : undefined,
-            transition: dragX === 0 ? 'transform 180ms cubic-bezier(0.22, 1, 0.36, 1)' : 'none',
-          }}
-        >
+        {/* Track-Info Viewport (Peeks Prev / Next Song on Horizontal Swipe Without Overlapping Buttons) */}
+        <div className="relative flex-1 min-w-0 overflow-hidden cursor-grab active:cursor-grabbing">
+          {prevSong && dragX > 8 && (
+            <div
+              aria-hidden="true"
+              className="absolute inset-0 flex items-center gap-2.5 min-w-0 pointer-events-none"
+              style={{
+                transform: `translateX(calc(-100% + ${dragX}px))`,
+                transition: trackTransition,
+              }}
+            >
+              <div
+                className={`w-10 h-10 rounded-[16px] bg-gradient-to-br ${getSongGradient(
+                  prevSong.id
+                )} flex items-center justify-center text-white shadow-xs shrink-0`}
+              >
+                <Music2 className="w-4 h-4" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-[#1D1D1F] truncate">{prevSong.title}</p>
+                <p className="text-[11px] text-[#6E6E73] truncate">
+                  {prevSong.is_unknown_author ? t.unknownAuthor : prevSong.artist}
+                </p>
+              </div>
+            </div>
+          )}
+
           <div
-            className={`w-10 h-10 rounded-[16px] bg-gradient-to-br ${gradient} flex items-center justify-center text-white shadow-xs shrink-0`}
+            className="flex items-center gap-2.5 min-w-0"
+            style={{
+              transform: dragX !== 0 ? `translateX(${dragX}px)` : undefined,
+              transition: trackTransition,
+            }}
           >
-            <Music2 className="w-4 h-4" />
-          </div>
-          <div className="min-w-0">
-            <p className="text-xs font-bold text-[#1D1D1F] truncate">{song.title}</p>
-            <div className="flex items-center gap-1.5 min-w-0">
-              {isOffline && (
-                <span className="w-1.5 h-1.5 rounded-full bg-[#34C759] shrink-0" title={t.savedOffline} />
-              )}
-              <p className="text-[11px] text-[#6E6E73] truncate">{author}</p>
+            <div
+              className={`w-10 h-10 rounded-[16px] bg-gradient-to-br ${gradient} flex items-center justify-center text-white shadow-xs shrink-0`}
+            >
+              <Music2 className="w-4 h-4" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs font-bold text-[#1D1D1F] truncate">{song.title}</p>
+              <div className="flex items-center gap-1.5 min-w-0">
+                {isOffline && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#34C759] shrink-0" title={t.savedOffline} />
+                )}
+                <p className="text-[11px] text-[#6E6E73] truncate">{author}</p>
+              </div>
             </div>
           </div>
+
+          {nextSong && dragX < -8 && (
+            <div
+              aria-hidden="true"
+              className="absolute inset-0 flex items-center gap-2.5 min-w-0 pointer-events-none"
+              style={{
+                transform: `translateX(calc(100% + ${dragX}px))`,
+                transition: trackTransition,
+              }}
+            >
+              <div
+                className={`w-10 h-10 rounded-[16px] bg-gradient-to-br ${getSongGradient(
+                  nextSong.id
+                )} flex items-center justify-center text-white shadow-xs shrink-0`}
+              >
+                <Music2 className="w-4 h-4" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-[#1D1D1F] truncate">{nextSong.title}</p>
+                <p className="text-[11px] text-[#6E6E73] truncate">
+                  {nextSong.is_unknown_author ? t.unknownAuthor : nextSong.artist}
+                </p>
+              </div>
+            </div>
+          )}
         </div>
 
-        <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="flex items-center gap-1 shrink-0"
+          onClick={(e) => e.stopPropagation()}
+          onPointerDown={(e) => e.stopPropagation()}
+        >
           <button
             type="button"
             onClick={onToggleShuffle}
