@@ -885,6 +885,7 @@ export function App() {
                           isSavingOffline={savingOfflineId === s.id}
                           isInPlaylist={playlistIdSet.has(s.id)}
                           isKaynar={listenFilter === 'all' && KAYNAR_AUDIO_IDS.has(s.id)}
+                          showKeyBadge={showKeyFilter}
                           t={t}
                           onPlay={handleRowPlay}
                           onOpenLyrics={handleOpenSongLyrics}
@@ -945,6 +946,7 @@ export function App() {
                     isOffline={offlineIdSet.has(s.id)}
                     isSavingOffline={savingOfflineId === s.id}
                     isInPlaylist={playlistIdSet.has(s.id)}
+                    showKeyBadge={showKeyFilter}
                     t={t}
                     onPlay={handleRowPlay}
                     onOpenLyrics={handleOpenSongLyrics}
@@ -1131,6 +1133,7 @@ export function App() {
                         isOffline={offlineIds.includes(s.id)}
                         isSavingOffline={savingOfflineId === s.id}
                         isInPlaylist={true}
+                        showKeyBadge={showKeyFilter}
                         t={t}
                         onPlay={(song) => void player.playSong(song)}
                         onOpenLyrics={(song) => handleOpenSongLyrics(song)}
@@ -1168,6 +1171,7 @@ export function App() {
                         isOffline={true}
                         isSavingOffline={savingOfflineId === s.id}
                         isInPlaylist={playlistIds.includes(s.id)}
+                        showKeyBadge={showKeyFilter}
                         t={t}
                         onPlay={(song) => void player.playSong(song)}
                         onOpenLyrics={(song) => handleOpenSongLyrics(song)}

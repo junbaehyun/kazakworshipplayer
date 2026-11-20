@@ -27,6 +27,7 @@ interface SongRowProps {
   isInPlaylist?: boolean;
   isLiked?: boolean;
   isKaynar?: boolean;
+  showKeyBadge?: boolean;
   t: TranslationStrings;
   onPlay: (song: Song) => void;
   onOpenLyrics?: (song: Song) => void;
@@ -44,6 +45,7 @@ export const SongRow = memo(function SongRow({
   isOffline = false,
   isInPlaylist = false,
   isKaynar = false,
+  showKeyBadge = false,
   t,
   onPlay,
   onOpenLyrics,
@@ -103,7 +105,7 @@ export const SongRow = memo(function SongRow({
               {authorLabel}
               {hasAudio ? ` · ▶ ${song.play_count.toLocaleString()} ${t.plays}` : ''}
             </p>
-            {song.song_key && (
+            {showKeyBadge && song.song_key && (
               <span className="px-1.5 py-0.5 rounded-md bg-[#F5F5F7] text-[#1D1D1F] text-[9px] font-extrabold border border-black/[0.05] shrink-0">
                 {song.song_key}
               </span>
