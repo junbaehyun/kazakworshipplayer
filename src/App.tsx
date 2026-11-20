@@ -425,6 +425,23 @@ export function App() {
     onSongEnded: handleSongEnded,
   });
 
+  const { prevQueueSong, nextQueueSong } = useMemo(() => {
+    const currentId = player.currentSong?.id;
+    if (!currentId || libraryQueue.length <= 1) {
+      return { prevQueueSong: null as Song | null, nextQueueSong: null as Song | null };
+    }
+    const idx = libraryQueue.findIndex((s) => s.id === currentId);
+    if (idx < 0) {
+      return { prevQueueSong: null as Song | null, nextQueueSong: null as Song | null };
+    }
+    const prevIdx = (idx - 1 + libraryQueue.length) % libraryQueue.length;
+    const nextIdx = (idx + 1) % libraryQueue.length;
+    return {
+      prevQueueSong: libraryQueue[prevIdx] ?? null,
+      nextQueueSong: libraryQueue[nextIdx] ?? null,
+    };
+  }, [libraryQueue, player.currentSong]);
+
   const handleOpenSongLyrics = useCallback(
     (song: Song, version?: 'standard' | 'kaynar') => {
       setPreferredLyricsVersion(version ?? (listenFilter === 'kaynar' ? 'kaynar' : 'standard'));
@@ -1246,6 +1263,7 @@ export function App() {
           t={t}
           onExpand={() => setIsFullPlayerOpen(true)}
           onTogglePlay={() => void player.togglePlay()}
+          onPrev={() => player.playPrev(true)}
           onNext={() => player.playNext(false)}
           onPlayFirst={() => {
             if (libraryQueue[0]) void player.playSong(libraryQueue[0]);
@@ -1383,11 +1401,14 @@ export function App() {
             <FullPlayerSheet
               isOpen={isFullPlayerOpen}
               song={player.currentSong}
+              prevSong={prevQueueSong}
+              nextSong={nextQueueSong}
               kaynarSong={KAYNAR_SONG_BY_AUDIO_ID.get(player.currentSong.id) ?? null}
               lang={lang}
               defaultLyricsVersion={preferredLyricsVersion}
               isPlaying={player.isPlaying}
               isOffline={offlineIdSet.has(player.currentSong.id)}
+              isLiked={likedIdSet.has(player.currentSong.id)}
               isSavingOffline={savingOfflineId === player.currentSong.id}
               currentTime={player.currentTime}
               duration={player.duration}
@@ -1396,12 +1417,14 @@ export function App() {
               t={t}
               onClose={() => setIsFullPlayerOpen(false)}
               onTogglePlay={() => void player.togglePlay()}
-              onPrev={player.playPrev}
+              onPrev={() => player.playPrev(false)}
+              onSwipePrev={() => player.playPrev(true)}
               onNext={() => player.playNext(false)}
               onSeek={player.seekTo}
               onCycleRepeat={player.cycleRepeat}
               onToggleShuffle={player.toggleShuffle}
               onToggleOffline={handleRowToggleOffline}
+              onToggleLike={handleToggleLike}
               onOpenReport={handleRowOpenReport}
               onOpenLyricsMode={handleOpenSongLyrics}
             />

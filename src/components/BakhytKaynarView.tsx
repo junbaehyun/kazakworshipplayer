@@ -6,6 +6,7 @@ import {
   type KaynarLyricLine,
   type KaynarSong,
 } from '../data/bakhytKaynarSongs';
+import { parseChordedLine, shouldUseFlats, transposeKey } from '../lib/chords';
 import type { Language, Song } from '../types';
 
 interface BakhytKaynarViewProps {
@@ -177,6 +178,7 @@ export function BakhytKaynarView({
   const hasKoreanHymn = activeSong.hasKoreanHymn !== false;
   const hasEnglish = Boolean(activeSong.hasEnglish);
   const hasChords = sections.some((sec) => sec.lines.some((l) => Boolean(l.chords)));
+  const preferFlats = shouldUseFlats(activeSong.songKey, transpose);
   const linkedAudio = findLinkedAudio(activeSong.id);
   const isCurrAudio = Boolean(linkedAudio && currentSong?.id === linkedAudio.id);
 
@@ -306,8 +308,8 @@ export function BakhytKaynarView({
             </span>
             {activeSong.songKey ? (
               <span className="rounded-md bg-white px-2 py-0.5 text-xs font-extrabold text-[#1D1D1F] border border-black/[0.06]">
-                Key: {transposeChord(activeSong.songKey, transpose)}
-                {activeSong.capo ? ` (Capo ${activeSong.capo})` : ''}
+                Key: {transposeKey(activeSong.songKey, transpose)}
+                {activeSong.capo && transpose === 0 ? ` (Capo ${activeSong.capo})` : ''}
               </span>
             ) : null}
             {!hasChords && (
@@ -426,6 +428,7 @@ export function BakhytKaynarView({
                   showEnglish={showEnglish}
                   showChords={worshipLeaderMode}
                   transpose={transpose}
+                  preferFlats={preferFlats}
                 />
               </div>
             ))}
@@ -443,6 +446,7 @@ export function BakhytKaynarView({
                 showEnglish={showEnglish}
                 showChords={worshipLeaderMode}
                 transpose={transpose}
+                preferFlats={preferFlats}
               />
             ))}
           </div>
@@ -500,52 +504,6 @@ function LayerChip({
   );
 }
 
-const SHARP_SCALE = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-const FLAT_TO_SHARP: Record<string, string> = {
-  Db: 'C#',
-  Eb: 'D#',
-  Gb: 'F#',
-  Ab: 'G#',
-  Bb: 'A#',
-};
-
-function transposeNote(note: string, semitones: number): string {
-  if (!semitones) return note;
-  const normalized = FLAT_TO_SHARP[note] || note;
-  const idx = SHARP_SCALE.indexOf(normalized);
-  if (idx < 0) return note;
-  return SHARP_SCALE[(idx + semitones + 120) % 12];
-}
-
-function transposeChord(chord: string, semitones: number): string {
-  if (!semitones) return chord;
-  return chord.replace(/([A-G][#b]?)/g, (m) => transposeNote(m, semitones));
-}
-
-function parseChordedLine(
-  chorded: string,
-  semitones: number
-): Array<{ chord?: string; text: string }> {
-  const parts: Array<{ chord?: string; text: string }> = [];
-  const regex = /\[([^\]]+)\]([^\[]*)/g;
-  let lastIdx = 0;
-  let match: RegExpExecArray | null;
-  while ((match = regex.exec(chorded)) !== null) {
-    if (match.index > lastIdx) {
-      parts.push({ text: chorded.slice(lastIdx, match.index) });
-    }
-    parts.push({
-      chord: transposeChord(match[1].trim(), semitones),
-      text: match[2],
-    });
-    lastIdx = regex.lastIndex;
-  }
-  if (lastIdx < chorded.length) {
-    parts.push({ text: chorded.slice(lastIdx) });
-  }
-  return parts;
-}
-
 function LyricLineCard({
   line,
   font,
@@ -555,6 +513,7 @@ function LyricLineCard({
   showEnglish,
   showChords,
   transpose,
+  preferFlats,
 }: {
   line: KaynarLyricLine;
   font: (typeof FONT_SCALES)[number];
@@ -564,9 +523,10 @@ function LyricLineCard({
   showEnglish: boolean;
   showChords: boolean;
   transpose: number;
+  preferFlats?: boolean;
 }) {
   const chordSegments =
-    showChords && line.chords ? parseChordedLine(line.chords, transpose) : null;
+    showChords && line.chords ? parseChordedLine(line.chords, transpose, preferFlats) : null;
 
   return (
     <article className="px-4 py-3.5">

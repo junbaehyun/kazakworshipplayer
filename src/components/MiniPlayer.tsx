@@ -1,3 +1,4 @@
+import { useRef, useState, type TouchEvent as ReactTouchEvent } from 'react';
 import { Music2, Pause, Play, Shuffle, SkipForward } from 'lucide-react';
 import type { TranslationStrings } from '../i18n/translations';
 import type { Song } from '../types';
@@ -15,6 +16,7 @@ interface MiniPlayerProps {
   t: TranslationStrings;
   onExpand: () => void;
   onTogglePlay: () => void;
+  onPrev?: () => void;
   onNext: () => void;
   onPlayFirst: () => void;
   onShufflePlay: () => void;
@@ -33,11 +35,21 @@ export function MiniPlayer({
   t,
   onExpand,
   onTogglePlay,
+  onPrev,
   onNext,
   onPlayFirst,
   onShufflePlay,
   onToggleShuffle,
 }: MiniPlayerProps) {
+  const [dragX, setDragX] = useState(0);
+  const touchRef = useRef<{
+    x: number;
+    y: number;
+    t: number;
+    axis: 'none' | 'x' | 'y';
+  } | null>(null);
+  const suppressClickRef = useRef(false);
+
   const positionClass = hasBottomNav
     ? 'bottom-[calc(72px+env(safe-area-inset-bottom))]'
     : 'bottom-[calc(14px+env(safe-area-inset-bottom))]';
@@ -80,17 +92,99 @@ export function MiniPlayer({
     );
   }
 
+  const handleTouchStart = (e: ReactTouchEvent) => {
+    if ((e.target as HTMLElement | null)?.closest('button')) return;
+    const touch = e.touches[0];
+    if (!touch) return;
+    touchRef.current = {
+      x: touch.clientX,
+      y: touch.clientY,
+      t: Date.now(),
+      axis: 'none',
+    };
+  };
+
+  const handleTouchMove = (e: ReactTouchEvent) => {
+    const start = touchRef.current;
+    const touch = e.touches[0];
+    if (!start || !touch) return;
+    const dx = touch.clientX - start.x;
+    const dy = touch.clientY - start.y;
+
+    if (start.axis === 'none') {
+      if (Math.hypot(dx, dy) < 8) return;
+      if (Math.abs(dx) > Math.abs(dy) * 1.4) {
+        start.axis = 'x';
+      } else if (dy < -12 && Math.abs(dy) > Math.abs(dx) * 1.4) {
+        start.axis = 'y';
+      } else {
+        return;
+      }
+    }
+
+    if (start.axis === 'x') {
+      setDragX(Math.max(-44, Math.min(44, dx * 0.45)));
+    }
+  };
+
+  const handleTouchEnd = (e: ReactTouchEvent) => {
+    const start = touchRef.current;
+    touchRef.current = null;
+    setDragX(0);
+    if (!start) return;
+
+    const touch = e.changedTouches[0];
+    if (!touch) return;
+    const dx = touch.clientX - start.x;
+    const dy = touch.clientY - start.y;
+    const dt = Math.max(Date.now() - start.t, 1);
+    const velocity = Math.abs(dx) / dt;
+
+    if (start.axis === 'x') {
+      suppressClickRef.current = true;
+      window.setTimeout(() => {
+        suppressClickRef.current = false;
+      }, 220);
+      if (Math.abs(dx) > 44 || (Math.abs(dx) > 18 && velocity > 0.45)) {
+        if (typeof navigator.vibrate === 'function') {
+          navigator.vibrate(10);
+        }
+        if (dx < 0) onNext();
+        else onPrev?.();
+      }
+    } else if (start.axis === 'y' && dy < -36) {
+      suppressClickRef.current = true;
+      window.setTimeout(() => {
+        suppressClickRef.current = false;
+      }, 220);
+      onExpand();
+    }
+  };
+
   const progress = duration > 0 ? Math.min(100, (currentTime / duration) * 100) : 0;
   const author = song.is_unknown_author ? t.unknownAuthor : song.artist;
   const gradient = getSongGradient(song.id);
 
   return (
     <div
-      onClick={onExpand}
-      className={`fixed ${positionClass} left-1/2 -translate-x-1/2 w-[calc(100%-24px)] max-w-[406px] z-30 rounded-[28px] liquid-glass px-3 py-2 cursor-pointer active:scale-[0.99] am-spring`}
+      onClick={() => {
+        if (suppressClickRef.current) return;
+        onExpand();
+      }}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      onTouchCancel={handleTouchEnd}
+      className={`fixed ${positionClass} left-1/2 -translate-x-1/2 w-[calc(100%-24px)] max-w-[406px] z-30 rounded-[28px] liquid-glass overflow-hidden px-3 py-2 cursor-pointer active:scale-[0.99] am-spring touch-pan-y select-none`}
     >
       <div className="flex items-center justify-between gap-2.5">
-        <div className="flex items-center gap-2.5 min-w-0">
+        <div
+          className="flex items-center gap-2.5 min-w-0 flex-1"
+          style={{
+            transform: dragX !== 0 ? `translateX(${dragX}px)` : undefined,
+            transition: dragX === 0 ? 'transform 180ms cubic-bezier(0.22, 1, 0.36, 1)' : 'none',
+          }}
+        >
           <div
             className={`w-10 h-10 rounded-[16px] bg-gradient-to-br ${gradient} flex items-center justify-center text-white shadow-xs shrink-0`}
           >

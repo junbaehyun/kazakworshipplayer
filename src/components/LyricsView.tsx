@@ -17,6 +17,13 @@ import {
 } from 'lucide-react';
 import type { KaynarSong } from '../data/bakhytKaynarSongs';
 import {
+  hasInlineChords,
+  parseChordedLine,
+  shouldUseFlats,
+  stripChords,
+  transposeKey,
+} from '../lib/chords';
+import {
   getCachedRussianTranslation,
   getSavedRussianVocab,
   isRussianLyrics,
@@ -78,60 +85,6 @@ const FONT_SIZE_CLASSES = [
 
 const AUTO_SCROLL_SPEEDS = [0, 1, 1.5, 2] as const;
 type AutoScrollSpeed = (typeof AUTO_SCROLL_SPEEDS)[number];
-
-const SHARP_SCALE = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-const FLAT_TO_SHARP: Record<string, string> = {
-  Db: 'C#',
-  Eb: 'D#',
-  Gb: 'F#',
-  Ab: 'G#',
-  Bb: 'A#',
-};
-
-function transposeNote(note: string, semitones: number): string {
-  if (!semitones) return note;
-  const normalized = FLAT_TO_SHARP[note] || note;
-  const idx = SHARP_SCALE.indexOf(normalized);
-  if (idx < 0) return note;
-  return SHARP_SCALE[(idx + semitones + 120) % 12];
-}
-
-function transposeChord(chord: string, semitones: number): string {
-  if (!semitones) return chord;
-  return chord.replace(/([A-G][#b]?)/g, (m) => transposeNote(m, semitones));
-}
-
-function stripChords(line: string): string {
-  return line.replace(/\[([^\]]+)\]/g, '');
-}
-
-function hasInlineChords(line: string): boolean {
-  return /\[([A-GH][^\]]*)\]/.test(line);
-}
-
-function parseChordedLine(
-  chorded: string,
-  semitones: number
-): Array<{ chord?: string; text: string }> {
-  const parts: Array<{ chord?: string; text: string }> = [];
-  const regex = /\[([^\]]+)\]([^\[]*)/g;
-  let lastIdx = 0;
-  let match: RegExpExecArray | null;
-  while ((match = regex.exec(chorded)) !== null) {
-    if (match.index > lastIdx) {
-      parts.push({ text: chorded.slice(lastIdx, match.index) });
-    }
-    parts.push({
-      chord: transposeChord(match[1].trim(), semitones),
-      text: match[2],
-    });
-    lastIdx = regex.lastIndex;
-  }
-  if (lastIdx < chorded.length) {
-    parts.push({ text: chorded.slice(lastIdx) });
-  }
-  return parts;
-}
 
 function parseStanzas(raw: string): Stanza[] {
   const trimmed = raw.trim();
@@ -445,6 +398,7 @@ export function LyricsView({
     activeVersion === 'kaynar' ? kaynarHasChords || standardHasChords : standardHasChords;
   const activeKey = songKey || kaynarSong?.songKey || null;
   const activeCapo = capo || kaynarSong?.capo || null;
+  const preferFlats = shouldUseFlats(activeKey, transpose);
 
   const activeIndex = useMemo(() => {
     if (!isPlaying || totalBlocks <= 1 || duration <= 0) return -1;
@@ -728,8 +682,8 @@ export function LyricsView({
           )}
           {activeKey && (
             <span className="rounded-md bg-white px-2 py-0.5 text-[11px] font-extrabold text-[#1D1D1F] border border-black/[0.06] truncate">
-              Key: {transposeChord(activeKey, transpose)}
-              {activeCapo ? ` (Capo ${activeCapo})` : ''}
+              Key: {transposeKey(activeKey, transpose)}
+              {activeCapo && transpose === 0 ? ` (Capo ${activeCapo})` : ''}
             </span>
           )}
           <button
@@ -973,7 +927,7 @@ export function LyricsView({
                     {sec.lines.map((line, lineIdx) => {
                       const chordSegments =
                         showChords && line.chords
-                          ? parseChordedLine(line.chords, transpose)
+                          ? parseChordedLine(line.chords, transpose, preferFlats)
                           : null;
                       const interactiveKaynar = showWordStudyTools && studyMode;
                       const tokenizedChordSegments =
@@ -1102,7 +1056,7 @@ export function LyricsView({
                   {stanza.lines.map((line, lineIdx) => {
                     const lineHasChords = showChords && hasInlineChords(line);
                     const chordSegments = lineHasChords
-                      ? parseChordedLine(line, transpose)
+                      ? parseChordedLine(line, transpose, preferFlats)
                       : null;
                     const plainLine = stripChords(line);
                     const interactiveWords = showWordStudyTools && studyMode;

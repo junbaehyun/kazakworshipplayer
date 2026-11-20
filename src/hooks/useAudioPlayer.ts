@@ -224,12 +224,13 @@ export function useAudioPlayer({
     [currentSong, isShuffle, playSong, repeatMode, songs]
   );
 
-  const playPrev = useCallback(() => {
-    if (songs.length === 0) return;
-    if (audioRef.current && audioRef.current.currentTime > 3) {
-      audioRef.current.currentTime = 0;
-      return;
-    }
+  const playPrev = useCallback(
+    (forcePrevious = false) => {
+      if (songs.length === 0) return;
+      if (!forcePrevious && audioRef.current && audioRef.current.currentTime > 3) {
+        audioRef.current.currentTime = 0;
+        return;
+      }
     if (isShuffle && shuffleHistoryRef.current.length > 0) {
       const songMap = new Map(songs.map((s) => [s.id, s]));
       while (shuffleHistoryRef.current.length > 0) {
@@ -248,10 +249,12 @@ export function useAudioPlayer({
         }
       }
     }
-    const idx = currentSong ? songs.findIndex((s) => s.id === currentSong.id) : 0;
-    const prevIdx = (idx - 1 + songs.length) % songs.length;
-    void playSong(songs[prevIdx]);
-  }, [currentSong, isShuffle, playSong, songs]);
+      const idx = currentSong ? songs.findIndex((s) => s.id === currentSong.id) : 0;
+      const prevIdx = (idx - 1 + songs.length) % songs.length;
+      void playSong(songs[prevIdx]);
+    },
+    [currentSong, isShuffle, playSong, songs]
+  );
 
   const seekTo = useCallback((seconds: number) => {
     if (!audioRef.current) return;
@@ -370,7 +373,7 @@ export function useAudioPlayer({
     if (!('mediaSession' in navigator)) return;
     navigator.mediaSession.setActionHandler('play', () => void togglePlay());
     navigator.mediaSession.setActionHandler('pause', () => void togglePlay());
-    navigator.mediaSession.setActionHandler('previoustrack', () => playPrev());
+    navigator.mediaSession.setActionHandler('previoustrack', () => playPrev(false));
     navigator.mediaSession.setActionHandler('nexttrack', () => playNext(false));
     navigator.mediaSession.setActionHandler('seekto', (details) => {
       if (typeof details.seekTime === 'number') seekTo(details.seekTime);
