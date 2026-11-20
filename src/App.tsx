@@ -6,6 +6,7 @@ import {
   Check,
   Download,
   HardDrive,
+  Heart,
   Loader2,
   Music,
   Search,
@@ -63,7 +64,7 @@ const LIKED_KEY = 'kwp_liked_ids_v1';
 const DEV_KAYNAR_KEY = 'kwp_show_kaynar_tab';
 const SHOW_KEY_FILTER_KEY = 'kwp_show_key_filter';
 
-type ListenFilter = 'all' | 'kaynar' | 'ru' | 'playlist' | 'offline';
+type ListenFilter = 'all' | 'playlist' | 'kk' | 'ru' | 'kaynar';
 const GUITAR_KEYS = ['all', 'C', 'D', 'Dm', 'E', 'Em', 'F', 'G', 'A', 'Am', 'Bm', 'Bb'] as const;
 
 const PAGE_SIZE = 80;
@@ -305,10 +306,10 @@ export function App() {
       base = !q
         ? playlistSongs
         : playlistSongs.filter((s) => (searchTextById.get(s.id) ?? s.title.toLowerCase()).includes(q));
+    } else if (listenFilter === 'kk') {
+      base = filteredSongs.filter((s) => !(s.lang === 'ru' || s.id.startsWith('song-ru-')));
     } else if (listenFilter === 'ru') {
       base = filteredSongs.filter((s) => s.lang === 'ru' || s.id.startsWith('song-ru-'));
-    } else if (listenFilter === 'offline') {
-      base = filteredSongs.filter((s) => offlineIdSet.has(s.id));
     } else {
       base = filteredSongs;
     }
@@ -320,7 +321,7 @@ export function App() {
       });
     }
     return base;
-  }, [filteredSongs, listenFilter, offlineIdSet, playlistSongs, search, searchTextById, selectedKey]);
+  }, [filteredSongs, listenFilter, playlistSongs, search, searchTextById, selectedKey]);
 
   useEffect(() => {
     setVisibleCount(PAGE_SIZE);
@@ -730,18 +731,36 @@ export function App() {
             <>
               <InstallPromptBanner t={t} />
 
-              {/* Filter Chips (All | My Playlist | Русский | [Бақыт қайнар] | Offline) */}
+              {/* Filter Chips (All | ♥ Playlist | Қазақша | Русский | [Бақыт қайнар]) */}
               <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
                 {(
                   [
                     { id: 'all', label: t.filterAll },
-                    { id: 'playlist', label: `♥ ${t.myPlaylistTitle}` },
+                    { id: 'playlist', label: t.myPlaylistTitle, iconOnly: true },
+                    { id: 'kk', label: 'Қазақша' },
                     { id: 'ru', label: 'Русский' },
                     ...(showKaynarTab ? [{ id: 'kaynar' as const, label: t.tabKaynar }] : []),
-                    { id: 'offline', label: t.tabOffline },
-                  ] as { id: ListenFilter; label: string }[]
+                  ] as Array<{ id: ListenFilter; label: string; iconOnly?: boolean }>
                 ).map((chip) => {
                   const active = listenFilter === chip.id;
+                  if (chip.iconOnly) {
+                    return (
+                      <button
+                        key={chip.id}
+                        type="button"
+                        onClick={() => setListenFilter(chip.id)}
+                        aria-label={chip.label}
+                        title={chip.label}
+                        className={`px-3 py-1.5 rounded-full flex items-center justify-center transition shrink-0 ${
+                          active
+                            ? 'bg-[#FA243C] text-white shadow-xs'
+                            : 'bg-[#F5F5F7] text-[#FA243C] active:bg-black/10'
+                        }`}
+                      >
+                        <Heart className={`w-3.5 h-3.5 ${active ? 'fill-white' : 'fill-[#FA243C]'}`} />
+                      </button>
+                    );
+                  }
                   return (
                     <button
                       key={chip.id}
@@ -846,60 +865,11 @@ export function App() {
                   </div>
                 )}
 
-              {/* Offline Filter Storage Summary Banner */}
-              {listenFilter === 'offline' && (
-                <div className="rounded-2xl bg-[#F5F5F7] p-3.5 border border-black/[0.04] flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="w-9 h-9 rounded-xl bg-[#34C759]/15 text-[#34C759] flex items-center justify-center shrink-0">
-                      <HardDrive className="w-4 h-4" />
-                    </div>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <p className="text-xs font-extrabold text-[#1D1D1F] truncate">
-                          {t.offlineReady}
-                        </p>
-                        <span
-                          className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold ${
-                            isOnline
-                              ? 'bg-[#34C759]/15 text-[#34C759]'
-                              : 'bg-[#FF9500]/15 text-[#FF9500]'
-                          }`}
-                        >
-                          {isOnline ? (
-                            <Wifi className="w-2.5 h-2.5" />
-                          ) : (
-                            <WifiOff className="w-2.5 h-2.5" />
-                          )}
-                          <span>{isOnline ? 'Online' : 'Offline'}</span>
-                        </span>
-                      </div>
-                      <p className="text-[11px] font-medium text-[#86868B]">
-                        {offlineIds.length} MP3 · {(offlineBytes / (1024 * 1024)).toFixed(1)} MB
-                      </p>
-                    </div>
-                  </div>
-                  {offlineIds.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => void handleClearOffline()}
-                      className="px-2.5 py-1.5 rounded-xl bg-white text-[#FA243C] text-[11px] font-bold border border-black/[0.06] flex items-center gap-1 shrink-0 active:scale-95"
-                    >
-                      <Trash2 className="w-3 h-3" />
-                      <span>{t.storageClearBtn}</span>
-                    </button>
-                  )}
-                </div>
-              )}
-
               {/* Filtered Songs List */}
               <section className="space-y-1">
                 {listenSongs.length === 0 ? (
                   <p className="text-xs text-[#86868B] text-center py-8">
-                    {listenFilter === 'playlist'
-                      ? t.playlistEmpty
-                      : listenFilter === 'offline'
-                      ? t.offlineEmpty
-                      : t.noSongsFound}
+                    {listenFilter === 'playlist' ? t.playlistEmpty : t.noSongsFound}
                   </p>
                 ) : (
                   <>
