@@ -19,6 +19,20 @@ const GAS_WEBAPP_URL = (import.meta.env.VITE_GAS_WEBAPP_URL as string | undefine
 export const isSupabaseConfigured = Boolean(SUPABASE_URL && SUPABASE_KEY);
 export const isGasStorageConfigured = Boolean(GAS_WEBAPP_URL);
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function isUuid(id: string | null | undefined): id is string {
+  return Boolean(id && UUID_RE.test(id));
+}
+
+const LEGACY_SQL_SEED_NOTE_RE =
+  /^(Top #\d+ Kazakh worship|Test track \(#|External MP3 link test \(#)/;
+function isLegacySqlSeedDuplicate(song: Song): boolean {
+  return (
+    song.uploaded_by === 'developer' &&
+    Boolean(song.permission_note && LEGACY_SQL_SEED_NOTE_RE.test(song.permission_note))
+  );
+}
+
 function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -76,7 +90,13 @@ export async function fetchSongs(includePending = false): Promise<{ songs: Song[
     };
   }
 
-  const cloudSongs = (data as Song[]) || [];
+  const localAudioUrls = new Set(filteredLocal.map((s) => s.audio_url).filter(Boolean));
+  const localTitles = new Set(filteredLocal.map((s) => s.title.trim().toLowerCase()));
+  const cloudSongs = ((data as Song[]) || []).filter((s) => {
+    if (!isLegacySqlSeedDuplicate(s)) return true;
+    const titleKey = s.title.trim().toLowerCase();
+    return !localAudioUrls.has(s.audio_url) && !localTitles.has(titleKey);
+  });
   const cloudIds = new Set(cloudSongs.map((s) => s.id));
   const uniqueLocal = filteredLocal.filter((s) => !cloudIds.has(s.id));
 
@@ -235,7 +255,7 @@ export async function uploadSong(params: {
 }
 
 export async function incrementSongPlay(songId: string): Promise<number | null> {
-  if (supabase && !songId.startsWith('demo-') && !songId.startsWith('local-')) {
+  if (supabase && isUuid(songId)) {
     const { data, error } = await supabase.rpc('kwp_increment_play', { target_song_id: songId });
     if (!error && typeof data === 'number') return data;
   }
@@ -262,7 +282,7 @@ export async function submitReport(params: {
 }): Promise<void> {
   if (supabase) {
     const { error } = await supabase.from('kwp_song_reports').insert({
-      song_id: params.songId && !params.songId.startsWith('demo-') && !params.songId.startsWith('local-') ? params.songId : null,
+      song_id: isUuid(params.songId) ? params.songId : null,
       song_title: params.songTitle || 'General Message',
       report_type: params.reportType,
       reporter_contact: params.reporterContact.trim(),
@@ -395,7 +415,7 @@ export async function signOutAdmin(): Promise<void> {
 }
 
 export async function adminApproveSong(songId: string): Promise<void> {
-  if (supabase && !songId.startsWith('local-')) {
+  if (supabase && isUuid(songId)) {
     const { error } = await supabase
       .from('kwp_songs')
       .update({ status: 'published', is_active: true })
@@ -410,7 +430,7 @@ export async function adminApproveSong(songId: string): Promise<void> {
 }
 
 export async function adminDeleteSong(songId: string, storagePath?: string | null): Promise<void> {
-  if (supabase && !songId.startsWith('local-') && !songId.startsWith('demo-')) {
+  if (supabase && isUuid(songId)) {
     const { error } = await supabase.from('kwp_songs').delete().eq('id', songId);
     if (error) throw error;
     if (storagePath && storagePath.startsWith(`${STORAGE_FOLDER}/`)) {
@@ -434,7 +454,7 @@ export async function adminFetchReports(): Promise<SongReport[]> {
 }
 
 export async function adminResolveReport(reportId: string): Promise<void> {
-  if (supabase && !reportId.startsWith('rep-')) {
+  if (supabase && isUuid(reportId)) {
     await supabase.from('kwp_song_reports').update({ status: 'resolved' }).eq('id', reportId);
     return;
   }
